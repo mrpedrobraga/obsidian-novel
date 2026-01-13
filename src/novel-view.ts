@@ -117,6 +117,7 @@ export class NovelView extends FileView {
         this.editor.dom.setAttribute("autocorrect", "on");
         this.editor.dom.setAttribute("autocomplete", "on");
         this.editor.dom.setAttribute("autocapitalize", "sentences");
+        this.editor.focus();
     }
 
     async onLoadFile(file: TFile): Promise<void> {
@@ -215,21 +216,13 @@ function novelDecorationsPluginFactory(app: App) {
                     };
 
                     {
-                        const HEADER_REGEX = /^==\s*(.+?)\s*==$/;
+                        const HEADER_REGEX = /^(==\s*)(.+?)(\s*==)$/;
                         const headerMatch = HEADER_REGEX.exec(line.text);
 
                         if (headerMatch) {
-                            if (lineHasCursor) {
-                                builder.add(line.from, line.to, Decoration.mark({ class: 'novel-scene-header' }))
-                            } else {
-                                builder.add(
-                                    line.from,
-                                    line.to,
-                                    Decoration.replace({
-                                        widget: new HeaderWidget(headerMatch, headerMatch[1] ?? "[Broken Header]")
-                                    })
-                                );
-                            }
+                            builder.add(line.from, line.to, Decoration.mark({ class: `novel-scene-header ${lineHasCursor ? 'selected' : ''}` }))
+                            builder.add(line.from, line.from + (headerMatch[1]?.length ?? 0), Decoration.mark({ class: 'hide' }));
+                            builder.add(line.from + (headerMatch[1]?.length ?? 0) + (headerMatch[2]?.length ?? 0), line.to, Decoration.mark({ class: 'hide' }));
                             pos = line.to + 1;
                             continue;
                         }
@@ -445,17 +438,6 @@ function novelDecorationsPluginFactory(app: App) {
     }
 }
 
-class HeaderWidget extends WidgetType {
-    constructor(private raw: RegExpExecArray, private text: string) { super(); }
-
-    toDOM(view: EditorView): HTMLElement {
-        const span = document.createElement("span");
-        span.textContent = this.text;
-        span.classList.add("novel-scene-header");
-        return span;
-    }
-}
-
 type SpeakerOptions = { contd: boolean };
 
 class SpeakerWidget extends WidgetType {
@@ -465,7 +447,7 @@ class SpeakerWidget extends WidgetType {
         const el = document.createElement("a");
         el.textContent = this.alias ?? this.reference;
         if (this.options?.contd) {
-            el.textContent = `${el.textContent} (CONT'D)`;
+            el.textContent = `${el.textContent}(CONT'D)`;
         }
         el.classList.add("novel-speaker");
         el.classList.add("uppercase");
