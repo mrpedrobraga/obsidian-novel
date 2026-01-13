@@ -52,7 +52,7 @@ export class NovelView extends FileView {
     protected async onOpen(): Promise<void> {
         this.app.vault.on('modify', (file) => {
             if (file.path === this.file?.path) {
-                this.reloadFile(file);
+                this.reloadFile(file as any);
             }
         });
 
@@ -354,7 +354,6 @@ function novelDecorationsPluginFactory(app: App) {
                                         })
                                     )
                                     lastSpeaker = { reference: speakerMatch[1] ?? null, alias: speakerMatch[2] ?? null };
-
                                 }
                             }
 
