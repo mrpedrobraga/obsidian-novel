@@ -270,7 +270,7 @@ function novelDecorationsPluginFactory(app: App) {
                     }
 
                     {
-                        const TAGGED_ACTION_REGEX = /^#(\w+) (.+?)$/;
+                        const TAGGED_ACTION_REGEX = /^@(\w+) (.+?)$/;
                         const taggedActionMatch = TAGGED_ACTION_REGEX.exec(line.text);
 
                         if (taggedActionMatch) {
@@ -335,6 +335,7 @@ function novelDecorationsPluginFactory(app: App) {
                                         class: 'novel-speaker'
                                     })
                                 )
+                                lastSpeaker = { reference: speakerMatch[1] ?? null, alias: speakerMatch[2] ?? null };
                             } else {
                                 if (speakerMatch[1] == '&') {
                                     builder.add(
@@ -345,8 +346,6 @@ function novelDecorationsPluginFactory(app: App) {
                                         })
                                     )
                                 } else {
-                                    lastSpeaker = { reference: speakerMatch[1] ?? null, alias: speakerMatch[2] ?? null };
-
                                     builder.add(
                                         line.from,
                                         line.to,
@@ -354,6 +353,8 @@ function novelDecorationsPluginFactory(app: App) {
                                             widget: new SpeakerWidget(app, speakerMatch, speakerMatch[1] ?? "???", speakerMatch[2])
                                         })
                                     )
+                                    lastSpeaker = { reference: speakerMatch[1] ?? null, alias: speakerMatch[2] ?? null };
+
                                 }
                             }
 
@@ -447,7 +448,7 @@ class SpeakerWidget extends WidgetType {
         const el = document.createElement("a");
         el.textContent = this.alias ?? this.reference;
         if (this.options?.contd) {
-            el.textContent = `${el.textContent}(CONT'D)`;
+            el.textContent = `${el.textContent} (CONT'D)`;
         }
         el.classList.add("novel-speaker");
         el.classList.add("uppercase");
