@@ -23,7 +23,7 @@ export default class NovelPlugin extends Plugin {
             this.app.workspace.on('file-menu', (menu, file) => {
                 menu.addItem((item) => {
                     item
-                        .setTitle('New `novel` script!')
+                        .setTitle('New Script')
                         .setIcon('document')
                         .onClick(async () => {
                             this.app.vault.create(

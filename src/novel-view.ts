@@ -1,4 +1,4 @@
-import { App, debounce, Debouncer, FileView, TFile, WorkspaceLeaf } from "obsidian";
+import { App, debounce, Debouncer, FileView, Notice, TFile, WorkspaceLeaf } from "obsidian";
 import {
     EditorView,
     Decoration,
@@ -38,7 +38,7 @@ export class NovelView extends FileView {
     constructor(leaf: WorkspaceLeaf) {
         super(leaf);
 
-        this.saveDebounced = debounce(this.save, 300);
+        this.saveDebounced = debounce(this.save, 100);
     }
 
     getViewType(): string {
@@ -51,7 +51,7 @@ export class NovelView extends FileView {
 
     protected async onOpen(): Promise<void> {
         this.app.vault.on('modify', (file) => {
-            if (file.path === this.file?.path) {
+            if (file.path === this.file?.path && !this.editor?.hasFocus) {
                 this.reloadFile(file as any);
             }
         });
@@ -91,22 +91,6 @@ export class NovelView extends FileView {
                         if (!update.docChanged) return;
                         this.saveDebounced();
                     }),
-                    /* Bells and whistles */
-                    gutter({
-                        widgetMarker(view, widget, block): GutterMarker | null {
-                            if (widget instanceof SpeakerWidget) {
-                                return new class extends GutterMarker {
-                                    toDOM(view: EditorView): Node {
-                                        let node = document.createElement('span');
-                                        node.innerText = '💬';
-                                        return node;
-                                    }
-                                }();
-                            }
-
-                            return null;
-                        },
-                    }),
                 ]
             }),
             parent: wrapper
@@ -117,7 +101,6 @@ export class NovelView extends FileView {
         this.editor.dom.setAttribute("autocorrect", "on");
         this.editor.dom.setAttribute("autocomplete", "on");
         this.editor.dom.setAttribute("autocapitalize", "sentences");
-        this.editor.focus();
     }
 
     async onLoadFile(file: TFile): Promise<void> {
@@ -131,6 +114,7 @@ export class NovelView extends FileView {
         const diskText = await this.app.vault.read(file);
 
         if (currentText === diskText) return;
+        new Notice('Reload!');
 
         this.editor.dispatch({
             changes: { from: 0, to: this.editor.state.doc.length, insert: diskText }
@@ -322,7 +306,7 @@ function novelDecorationsPluginFactory(app: App) {
                     }
 
                     {
-                        const SPEAKER_REGEX = /^\[\s*(.+?)(?:\s*\|\s*(.+?)\s*)?\s*\]$/;
+                        const SPEAKER_REGEX = /^\[\s*([^\[\]|]+?)\s*(?:\|\s*([^\[\]]+?)\s*)?\]$/;
                         const speakerMatch = SPEAKER_REGEX.exec(line.text);
 
                         if (speakerMatch) {
@@ -400,15 +384,6 @@ function novelDecorationsPluginFactory(app: App) {
                                 const start = line.from + match.index;
                                 const end = start + match[0].length;
 
-                                /*builder.add(
-                                    start,
-                                    end,
-                                    Decoration.mark({
-                                        tagName: "a",
-                                        class: "novel-wikilink"
-                                    })
-                                );*/
-
                                 if (lineHasCursor) {
                                     builder.add(
                                         start, end, Decoration.mark({ class: 'novel-wikilink' })
@@ -425,7 +400,7 @@ function novelDecorationsPluginFactory(app: App) {
                             }
                         }
 
-                        decorateLineRange(line, builder, lineHasCursor);
+                        //decorateLineRange(line, builder, lineHasCursor);
 
                         pos = line.to + 1;
                         continue;
