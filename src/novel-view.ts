@@ -1,4 +1,4 @@
-import { App, debounce, Debouncer, FileView, Notice, TAbstractFile, TFile, ViewStateResult, WorkspaceLeaf } from "obsidian";
+import { App, Notice, TextFileView, TFile, WorkspaceLeaf } from "obsidian";
 import {
     EditorView,
     Decoration,
@@ -27,77 +27,43 @@ interface HeadingInfo {
     position: number;
 }
 
-interface NovelViewState {
-    filePath: string | undefined
-}
-
-export class NovelView extends FileView {
+export class NovelView extends TextFileView {
     editor: EditorView | null = null;
-    saveDebounced: Debouncer<[], void>;
-    file: TFile | null;
 
     constructor(leaf: WorkspaceLeaf) {
         super(leaf);
-        this.saveDebounced = debounce(this.save, 100);
-        this.file = null;
+    }
+
+    canAcceptExtension(extension: string): boolean {
+        return ["nov", "novel"].contains(extension)
+    }
+
+    getDisplayText() {
+        return this.file?.basename ?? "Script";
     }
 
     getViewType(): string {
         return NOVEL_VIEW_TYPE;
     }
 
-    getDisplayText(): string {
-        return this.file?.name ?? "Novel Editor";
-    }
-
-    async setState(state: NovelViewState, result: ViewStateResult) {
-        if (state.filePath) {
-            const file = this.app.vault.getAbstractFileByPath(state.filePath);
-            if (file instanceof TFile) {
-                await this.loadFile(file);
-            }
-        }
-
-        return super.setState(state, result);
-    }
-
-    getState() {
-        return {
-            filePath: this.file?.path
-        } satisfies NovelViewState;
-    }
-
     protected async onOpen(): Promise<void> {
-        this.app.vault.on('modify', (file) => {
-            if (file.path === this.file?.path && !this.editor?.hasFocus) {
-                this.loadFile(file as any);
-            }
-        });
-
         this.contentEl.empty();
         this.contentEl.classList.add("novel-view");
         const wrapper = this.contentEl.createDiv("markdown-source-view mod-cm6");
 
+        this.createEditor(wrapper);
+
+        this.addAction("save", "Save", async (evt) => {
+            await this.save();
+            new Notice("Saved!");
+        })
+    }
+
+    private createEditor(wrapper: HTMLDivElement) {
         this.editor = new EditorView({
             state: EditorState.create({
                 doc: "",
-                extensions: [
-                    EditorView.lineWrapping,
-                    scrollPastEnd(),
-                    search({ top: true }),
-                    keymap.of(searchKeymap),
-                    highlightSelectionMatches(),
-                    foldService.of(novelFoldService),
-                    foldService.of(propertyFoldService),
-                    keymap.of(foldKeymap),
-                    foldGutter({ openText: "▼", closedText: "▶" }),
-                    ViewPlugin.fromClass(novelDecorationsPluginFactory(this.app), {
-                        decorations: v => v.decorations
-                    }),
-                    EditorView.updateListener.of(update => {
-                        if (update.docChanged) this.saveDebounced();
-                    }),
-                ]
+                extensions: this.getExtensions()
             }),
             parent: wrapper
         });
@@ -109,55 +75,74 @@ export class NovelView extends FileView {
         this.editor.dom.setAttribute("autocapitalize", "sentences");
     }
 
-    async onLoadFile(file: TFile) {
-        await this.loadFile(file);
-        this.app.workspace.requestSaveLayout();
+    private getExtensions() {
+        return [
+            EditorView.lineWrapping,
+            scrollPastEnd(),
+            search({ top: true }),
+            keymap.of(searchKeymap),
+            highlightSelectionMatches(),
+            foldService.of(novelFoldService),
+            foldService.of(propertyFoldService),
+            keymap.of(foldKeymap),
+            foldGutter({ openText: "▼", closedText: "▶" }),
+            ViewPlugin.fromClass(novelDecorationsPluginFactory(this.app), {
+                decorations: v => v.decorations
+            }),
+            EditorView.updateListener.of(update => {
+                if (update.docChanged) {
+                    this.data = this.editor!.state.doc.toString();
+                    this.requestSave()
+                };
+            }),
+        ];
     }
 
-    async loadFile(file: TFile) {
-        const editor = this.editor;
+    getViewData(): string {
+        return this.data;
+    }
+
+    async setViewData(data: string, clear: boolean) {
+        this.data = data;
+
+        if (!this.editor) return;
+
+        const changes = clear
+            ? { from: 0, to: this.editor.state.doc.length, insert: "" }
+            : { from: 0, to: this.editor.state.doc.length, insert: data };
+
+        this.editor.dispatch({ changes });
+    }
+
+    clear(): void {
+        if (!this.editor) return;
+
+        this.editor.setState(EditorState.create({
+            doc: "",
+            extensions: this.getExtensions()
+        }));
+    }
+
+    async onLoadFile(file: TFile): Promise<void> {
         this.file = file;
+        const data = await this.app.vault.read(file);
+        await this.setViewData(data, false);
+    }
 
-        if (!editor) return;
-        const currentText = editor.state.doc.toString();
-        const diskText = await this.app.vault.read(file);
-        if (currentText === diskText) return;
+    async save(clear?: boolean) {
+        if (!this.file) return;
+        return await this.app.vault.modify(this.file, this.getViewData())
+    }
 
-        const topPos = editor.viewport.from;
-        const sel = editor.state.selection;
-
-        editor.dispatch({
-            changes: { from: 0, to: editor.state.doc.length, insert: diskText },
-            selection: sel
-        });
-
-        editor.requestMeasure({
-            read() { },
-            write() {
-                editor.dispatch({
-                    effects: EditorView.scrollIntoView(topPos, {
-                        y: "start",
-                        yMargin: 0
-                    })
-                });
-            }
-        });
-
+    protected async onClose(): Promise<void> {
+        super.onClose();
+        this.save();
+        this.editor?.destroy();
+        this.editor = null;
     }
 
     openSearch() {
         this.editor && openSearchPanel(this.editor);
-    }
-
-    async save() {
-        if (!this.file || !this.editor) return;
-        await this.app.vault.modify(this.file, this.editor.state.doc.toString());
-    }
-
-    protected async onClose(): Promise<void> {
-        await this.save();
-        this.editor?.destroy();
-        this.editor = null;
     }
 
     getHeadings(): HeadingInfo[] {

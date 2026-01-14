@@ -4,6 +4,7 @@ import { Decoration, DecorationSet, EditorView, PluginValue, ViewPlugin, ViewUpd
 import { RangeSetBuilder } from '@codemirror/state';
 import { join } from 'path';
 import { NOVEL_VIEW_TYPE, NovelView } from 'novel-view';
+import { DummyView, TXT_VIEW_TYPE } from 'dummy-txt-view';
 
 // Remember to rename these classes and interfaces!
 
@@ -18,6 +19,9 @@ export default class NovelPlugin extends Plugin {
         this.registerHoverLinkSource(NOVEL_VIEW_TYPE, { display: "Novel Editor", defaultMod: true });
 
         this.registerExtensions(["nov", "novel"], NOVEL_VIEW_TYPE);
+
+        this.registerView(TXT_VIEW_TYPE, (leaf) => new DummyView(leaf));
+        this.registerExtensions(["txt"], TXT_VIEW_TYPE);
 
         this.registerEvent(
             this.app.workspace.on('file-menu', (menu, file) => {
