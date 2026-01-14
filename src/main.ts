@@ -5,6 +5,7 @@ import { RangeSetBuilder } from '@codemirror/state';
 import { join } from 'path';
 import { NOVEL_VIEW_TYPE, NovelView } from 'novel-view';
 import { DummyView, TXT_VIEW_TYPE } from 'dummy-txt-view';
+import { QUERY_VIEW_TYPE, QueryView } from 'query-view';
 
 // Remember to rename these classes and interfaces!
 
@@ -15,13 +16,15 @@ export default class NovelPlugin extends Plugin {
         await this.loadSettings();
         this.addSettingTab(new NovelSettingTab(this.app, this));
 
+        this.registerNovelView();
+        this.registerTxtView();
+        this.registerQueryView();
+    }
+
+    private registerNovelView() {
         this.registerView(NOVEL_VIEW_TYPE, (leaf) => new NovelView(leaf));
         this.registerHoverLinkSource(NOVEL_VIEW_TYPE, { display: "Novel Editor", defaultMod: true });
-
         this.registerExtensions(["nov", "novel"], NOVEL_VIEW_TYPE);
-
-        this.registerView(TXT_VIEW_TYPE, (leaf) => new DummyView(leaf));
-        this.registerExtensions(["txt"], TXT_VIEW_TYPE);
 
         this.registerEvent(
             this.app.workspace.on('file-menu', (menu, file) => {
@@ -76,6 +79,16 @@ export default class NovelPlugin extends Plugin {
                 return true;
             }
         });
+    }
+
+    private registerTxtView() {
+        this.registerView(TXT_VIEW_TYPE, (leaf) => new DummyView(leaf));
+        this.registerHoverLinkSource(TXT_VIEW_TYPE, { display: "Plain Text", defaultMod: true });
+        this.registerExtensions(["txt"], TXT_VIEW_TYPE);
+    }
+
+    private registerQueryView() {
+        this.registerView(QUERY_VIEW_TYPE, (leaf) => new QueryView(leaf));
     }
 
     onunload() {
