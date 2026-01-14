@@ -78,8 +78,6 @@ export class NovelView extends TextFileView {
 
     private getExtensions() {
         return [
-
-
             EditorView.lineWrapping,
             scrollPastEnd(),
             search({ top: true }),
@@ -141,6 +139,12 @@ export class NovelView extends TextFileView {
         this.file = file;
         const data = await this.app.vault.read(file);
         await this.setViewData(data, false);
+    }
+
+    async onUnloadFile(file: TFile): Promise<void> {
+        this.file = null;
+        const data = "";
+        await this.setViewData(data, true);
     }
 
     async save(clear?: boolean) {
