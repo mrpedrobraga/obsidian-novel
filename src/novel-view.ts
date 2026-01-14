@@ -106,8 +106,7 @@ export class NovelView extends TextFileView {
                     },
                     /* optional */
                     displayText: 'blocks',
-                    showOverlay: 'always',
-                    gutters: [{ 1: '#00FF00', 2: '#00FF00' }],
+                    showOverlay: 'mouse-over',
                 }
             }),
         ];
