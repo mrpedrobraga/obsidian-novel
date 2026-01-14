@@ -18,6 +18,7 @@ import {
 } from "@codemirror/search";
 import { keymap } from "@codemirror/view";
 import { foldGutter, foldKeymap, foldService } from "@codemirror/language";
+import { showMinimap } from "@replit/codemirror-minimap"
 
 export const NOVEL_VIEW_TYPE = "novel";
 
@@ -77,6 +78,8 @@ export class NovelView extends TextFileView {
 
     private getExtensions() {
         return [
+
+
             EditorView.lineWrapping,
             scrollPastEnd(),
             search({ top: true }),
@@ -94,6 +97,18 @@ export class NovelView extends TextFileView {
                     this.data = this.editor!.state.doc.toString();
                     this.requestSave()
                 };
+            }),
+            showMinimap.compute(['doc'], (state) => {
+                return {
+                    create: (v: EditorView) => {
+                        const dom = document.createElement('div');
+                        return { dom }
+                    },
+                    /* optional */
+                    displayText: 'blocks',
+                    showOverlay: 'always',
+                    gutters: [{ 1: '#00FF00', 2: '#00FF00' }],
+                }
             }),
         ];
     }
