@@ -1,12 +1,13 @@
 import { renderAsString } from "novel-types";
-import { NOVEL_VIEW_TYPE, NovelView } from "novel-view";
-import { IconName, Notice, View } from "obsidian";
+import { NovelView } from "novel-view";
+import { IconName, View } from "obsidian";
 
 export const QUERY_VIEW_TYPE = "novel-query-view";
 
 export class QueryView extends View {
     selectedQuerySource = "Scenes";
     resultsContainer: HTMLDivElement;
+    currentView: NovelView | null;
 
     getViewType(): string {
         return QUERY_VIEW_TYPE;
@@ -51,6 +52,15 @@ export class QueryView extends View {
         this.registerEvent(
             this.app.workspace.on("active-leaf-change", () => this.updateResults())
         );
+        this.registerEvent(
+            this.app.vault.on('modify', (file) => {
+                if (this.currentView) {
+                    if (file.path == this.currentView.file?.path) {
+                        this.updateResults()
+                    }
+                }
+            })
+        )
     }
 
     async updateResults() {
@@ -58,6 +68,7 @@ export class QueryView extends View {
         const view = leaf?.view;
 
         if (view instanceof NovelView) {
+            this.currentView = view;
             this.resultsContainer.empty();
 
             if (this.selectedQuerySource == "Scenes") {
@@ -66,8 +77,8 @@ export class QueryView extends View {
 
                 this.updateWithItems(view, this.selectedQuerySource);
             }
-
         } else {
+            this.currentView = null;
             this.resultsContainer.empty();
             this.resultsContainer.setText("No information for the open view.");
         }

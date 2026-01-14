@@ -1,4 +1,4 @@
-import { Notice, TextFileView, TFile, WorkspaceLeaf } from "obsidian";
+import { debounce, Debouncer, Notice, TextFileView, TFile, WorkspaceLeaf } from "obsidian";
 import {
     EditorView,
     scrollPastEnd,
@@ -15,7 +15,7 @@ import { keymap } from "@codemirror/view";
 import { foldGutter, foldKeymap, foldService } from "@codemirror/language";
 import { QUERY_VIEW_TYPE } from "query-view";
 import { novelDecorationsPluginFactory, novelFoldService, propertyFoldService } from "novel-editor";
-import { Metadata, NovelDocument, NovelScene } from "novel-types";
+import { DocumentTextRange, Metadata, NovelDocument, NovelScene } from "novel-types";
 import { parseDocument } from "novel-parser";
 
 export const NOVEL_VIEW_TYPE = "novel";
@@ -36,9 +36,12 @@ interface ItemInfo {
 export class NovelView extends TextFileView {
     editor: EditorView | null = null;
     structure: NovelDocument | null = null;
+    rebuildStructureDb: Debouncer<[], void>;
 
     constructor(leaf: WorkspaceLeaf) {
         super(leaf);
+
+        this.rebuildStructureDb = debounce(this.rebuildStructure, 2000);
     }
 
     canAcceptExtension(extension: string): boolean {
@@ -101,12 +104,19 @@ export class NovelView extends TextFileView {
             EditorView.updateListener.of(update => {
                 if (update.docChanged) {
                     this.data = this.editor!.state.doc.toString();
-                    this.requestSave()
+                    this.requestSave();
+                    this.rebuildStructureDb();
                 };
             }),
 
             /* Language */
-            foldService.of(novelFoldService),
+            foldService.of((state: EditorState, lineStart: number) => {
+                const scene = this.sceneAtExact(state, lineStart);
+                if (!scene) return null;
+
+                return { from: scene.from + `== ${scene.name} ==`.length, to: scene.to }
+            }
+            ),
             foldService.of(propertyFoldService),
             ViewPlugin.fromClass(novelDecorationsPluginFactory(this.app), {
                 decorations: v => v.decorations
@@ -130,6 +140,14 @@ export class NovelView extends TextFileView {
         this.editor.dispatch({ changes });
 
         if (data == "") return;
+
+        this.rebuildStructure();
+    }
+
+    private rebuildStructure() {
+        if (!this.editor) return;
+
+        // Rebuilding it from scratch every time is non-ideal.
 
         try {
             const parseResult = parseDocument(this.editor.state.doc);
@@ -203,6 +221,20 @@ export class NovelView extends TextFileView {
     getScenes(): NovelScene[] {
         if (!this.structure) return [];
         return this.structure.scenes;
+    }
+
+    getSceneRangeAt(position: number): DocumentTextRange | null {
+        const scene = this.sceneAt(position);
+        if (!scene) return null;
+        return scene as DocumentTextRange;
+    }
+
+    sceneAt(position: number): NovelScene | undefined {
+        return this.structure?.scenes.find(scene => scene.from < position && position < scene.to);
+    }
+
+    sceneAtExact(state: EditorState, position: number): NovelScene | undefined {
+        return this.structure?.scenes.find(scene => scene.from == state.doc.lineAt(position).from);
     }
 }
 

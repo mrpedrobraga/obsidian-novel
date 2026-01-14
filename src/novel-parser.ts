@@ -139,7 +139,7 @@ export function parseScene(source: Text, position: number): Success<NovelScene> 
         advanceLine()
     }
 
-    scene.to = currentPosition;
+    scene.to = currentPosition - 1;
 
     return Success(scene);
 }
