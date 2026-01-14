@@ -5,6 +5,7 @@ export type Metadata = Record<PropertyKey, PropertyValue>;
 /** The novel document, which contains scenes. */
 export interface NovelDocument {
     metadata: Metadata;
+    scenes: NovelScene[];
 }
 
 /** The span of an element in the document itself. */
@@ -18,15 +19,16 @@ export interface NovelScene extends DocumentTextRange {
     /** Name of the scene */
     name: string;
     metadata: Metadata;
+    items: SceneItem[];
 }
 
 /* ----- Scene Items ----- */
 
 export type SceneItem =
-    | { t: "action"; c: ActionLine }
-    | { t: "speaker"; c: Speaker }
-    | { t: "dialogue"; c: DialogueLine }
-    | { t: "taggedAction"; c: TaggedAction };
+    | ({ t: "action" } & ActionLine)
+    | ({ t: "speaker" } & Speaker)
+    | ({ t: "dialogue" } & DialogueLine)
+    | ({ t: "taggedAction" } & TaggedAction);
 
 /** Plain action line. */
 export interface ActionLine extends DocumentTextRange {
@@ -50,14 +52,6 @@ export interface Speaker extends Reference {
     continued: boolean;
 }
 
-/** A reference to a concept. */
-export interface Reference extends DocumentTextRange {
-    /** Which to that this reference refers. */
-    referent: string;
-    /** An optional name to display in the link instead of the referent. */
-    alias?: string;
-}
-
 /* ----- Rich Text ----- */
 
 /** Text that has stuff inside of it... */
@@ -70,3 +64,20 @@ export type RichTextPart =
     | { t: "text"; c: string }
     | { t: "formatting"; f: string; c: RichText }
     | { t: "reference"; c: Reference };
+
+export function renderAsString(richText: RichText): string {
+    return richText.parts.map(x => {
+        if (x.t == "text") return x.c;
+        if (x.t == "formatting") return renderAsString(x.c);
+        if (x.t == "reference") return x.c.alias ?? x.c.referent;
+        return ""
+    }).join()
+}
+
+/** A reference to a concept. */
+export interface Reference extends DocumentTextRange {
+    /** Which to that this reference refers. */
+    referent: string;
+    /** An optional name to display in the link instead of the referent. */
+    alias?: string;
+}

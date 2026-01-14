@@ -1,4 +1,4 @@
-import { TextFileView, TFile, WorkspaceLeaf } from "obsidian";
+import { Notice, TextFileView, TFile, WorkspaceLeaf } from "obsidian";
 import {
     EditorView,
     scrollPastEnd,
@@ -15,6 +15,8 @@ import { keymap } from "@codemirror/view";
 import { foldGutter, foldKeymap, foldService } from "@codemirror/language";
 import { QUERY_VIEW_TYPE } from "query-view";
 import { novelDecorationsPluginFactory, novelFoldService, propertyFoldService } from "novel-editor";
+import { Metadata, NovelDocument, NovelScene } from "novel-types";
+import { parseDocument } from "novel-parser";
 
 export const NOVEL_VIEW_TYPE = "novel";
 
@@ -33,6 +35,7 @@ interface ItemInfo {
 
 export class NovelView extends TextFileView {
     editor: EditorView | null = null;
+    structure: NovelDocument | null = null;
 
     constructor(leaf: WorkspaceLeaf) {
         super(leaf);
@@ -125,6 +128,18 @@ export class NovelView extends TextFileView {
             : { from: 0, to: this.editor.state.doc.length, insert: data };
 
         this.editor.dispatch({ changes });
+
+        if (data == "") return;
+
+        try {
+            const parseResult = parseDocument(this.editor.state.doc);
+            if (parseResult.success) {
+                this.structure = parseResult.value;
+                console.log(parseResult.value, null, " ");
+            }
+        } catch (e) {
+            console.error(e);
+        }
     }
 
     clear(): void {
@@ -181,77 +196,13 @@ export class NovelView extends TextFileView {
         this.editor.focus();
     }
 
-    getHeadings(): HeadingInfo[] {
-        if (!this.editor) return [];
-
-        const headings: HeadingInfo[] = [];
-        const sceneRegex = /^==\s*(.+?)\s*==$/;
-        const metaRegex = /^([\w-]+)\s*:\s*(.+)$/;
-
-        const doc = this.editor.state.doc;
-        const totalLines = doc.lines;
-
-        for (let i = 1; i <= totalLines; i++) {
-            const line = doc.line(i);
-            const match = sceneRegex.exec(line.text);
-
-            if (!match) continue;
-
-            const metadata: Record<string, string> = {};
-
-            // look ahead for adjacent metadata lines
-            let j = i + 1;
-            while (j <= totalLines) {
-                const nextLine = doc.line(j);
-                const text = nextLine.text.trim();
-
-                // stop conditions
-                if (!text) break; // blank line
-                if (sceneRegex.test(text)) break; // next scene
-
-                const metaMatch = metaRegex.exec(text);
-                if (!metaMatch) break; // not metadata
-
-                metadata[metaMatch[1]!] = metaMatch[2]!;
-                j++;
-            }
-
-            headings.push({
-                level: 2,
-                text: match[1]?.trim() ?? "[Scene]",
-                position: line.from,
-                metadata,
-            });
-        }
-
-
-        return headings;
+    getMetadata(): Metadata {
+        return this.structure?.metadata ?? {};
     }
 
-    getItems(): ItemInfo[] {
-        if (!this.editor) return [];
-
-        const ITEM_REGEX = /^@(\w+) (.+?)$/;
-        const items = [];
-
-        const doc = this.editor.state.doc;
-        const totalLines = doc.lines;
-
-        for (let i = 1; i <= totalLines; i++) {
-            const line = doc.line(i);
-            const match = ITEM_REGEX.exec(line.text);
-
-            if (!match) continue;
-
-            items.push({
-                tag: match[1]!.trim(),
-                text: match[2]!.trim(),
-                position: line.from,
-            });
-        }
-
-        return items;
+    getScenes(): NovelScene[] {
+        if (!this.structure) return [];
+        return this.structure.scenes;
     }
-
 }
 

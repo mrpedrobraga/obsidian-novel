@@ -1,3 +1,4 @@
+import { renderAsString } from "novel-types";
 import { NOVEL_VIEW_TYPE, NovelView } from "novel-view";
 import { IconName, Notice, View } from "obsidian";
 
@@ -73,20 +74,20 @@ export class QueryView extends View {
     }
 
     private updateWithHeadings(view: NovelView) {
-        let headings = view.getHeadings();
-        for (const heading of headings) {
+        let scenes = view.getScenes();
+        for (const scene of scenes) {
             const element = this.resultsContainer.createEl("a", { cls: "query-result-entry scene", href: "#" });
-            element.createDiv({ cls: 'title', text: `${heading.text}` });
-            element.createDiv({ cls: 'summary', text: heading.metadata["Summary"] ?? 'No summary.' });
+            element.createDiv({ cls: 'title', text: `${scene.name}` });
+            element.createDiv({ cls: 'summary', text: scene.metadata["Summary"] ?? 'No summary.' });
 
-            for (const tag of heading.metadata["Tags"]?.split(/,\s*/) ?? []) {
+            for (const tag of scene.metadata["Tags"]?.split(/,\s*/) ?? []) {
                 element.classList.add(`scene-tagged-${tag.trim().toLowerCase()}`);
             }
 
             element.addEventListener('mousedown', (evt) => {
                 evt.preventDefault();
                 evt.stopPropagation();
-                view.scrollTo(heading.position);
+                view.scrollTo(scene.from);
             });
         }
     }
@@ -94,7 +95,7 @@ export class QueryView extends View {
     private updateWithItems(view: NovelView, type: string | null) {
         const deduplicate = false;
 
-        let items = view.getItems();
+        let items = view.getScenes().flatMap(scene => scene.items).filter(x => x.t == "taggedAction");
 
         // Filter by type
         if (type) {
@@ -105,8 +106,9 @@ export class QueryView extends View {
         if (deduplicate) {
             const deduplicationSet = new Set();
             items = items.filter(item => {
-                if (deduplicationSet.has(item.text)) return false;
-                deduplicationSet.add(item.text);
+                const asString = renderAsString(item.content);
+                if (deduplicationSet.has(asString)) return false;
+                deduplicationSet.add(asString);
                 return true;
             })
         }
@@ -114,13 +116,13 @@ export class QueryView extends View {
         for (const item of items) {
             const element = this.resultsContainer.createEl("a", { cls: "query-result-entry item selected", href: "#" });
             element.createDiv({ cls: 'novel-tagged-action-tag', text: item.tag });
-            element.createDiv({ cls: 'novel-tagged-action-text', text: item.text });
+            element.createDiv({ cls: 'novel-tagged-action-text', text: renderAsString(item.content) });
             element.classList.add(`tag-${item.tag.trim().toLowerCase()}`)
 
             element.addEventListener('mousedown', (evt) => {
                 evt.preventDefault();
                 evt.stopPropagation();
-                view.scrollTo(item.position);
+                view.scrollTo(item.from);
             });
         }
     }
