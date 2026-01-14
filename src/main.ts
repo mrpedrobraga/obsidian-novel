@@ -1,4 +1,4 @@
-import { Notice, Plugin, View } from 'obsidian';
+import { FileView, Notice, Plugin, TFile, View } from 'obsidian';
 import { DEFAULT_SETTINGS, NovelSettings, SampleSettingTab as NovelSettingTab } from "./settings";
 import { Decoration, DecorationSet, EditorView, PluginValue, ViewPlugin, ViewUpdate, WidgetType } from '@codemirror/view';
 import { RangeSetBuilder } from '@codemirror/state';
@@ -26,19 +26,41 @@ export default class NovelPlugin extends Plugin {
                         .setTitle('New Script')
                         .setIcon('document')
                         .onClick(async () => {
-                            this.app.vault.create(
-                                join(file.path, 'Untitled.nov'),
-                                "== First Scene ==\n\nSomething was happening..."
-                            )
-                            new Notice(file.path);
+                            (this.app as any).commands.executeCommandById('novel:new-file');
                         });
                 });
             })
         );
 
         this.addCommand({
+            id: "new-file",
+            name: "New Script",
+            callback: async () => {
+                const leaf = this.app.workspace.getMostRecentLeaf();
+                const folder = leaf?.view instanceof FileView
+                    ? leaf.view.file?.parent
+                    : this.app.vault.getRoot();
+
+                if (!folder) return;
+
+                let base = "Untitled";
+                let path = `${folder.path}/${base}.nov`;
+                let i = 1;
+
+                while (this.app.vault.getAbstractFileByPath(path)) {
+                    path = `${folder.path}/${base} ${i++}.nov`;
+                }
+
+                const file = await this.app.vault.create(path, "");
+                const l = this.app.workspace.getLeaf(true);
+                await l.openFile(file);
+                this.app.workspace.setActiveLeaf(l);
+            }
+        });
+
+        this.addCommand({
             id: "novel-find",
-            name: "Find in novel",
+            name: "Find in script",
             hotkeys: [{ modifiers: ["Mod"], key: "f" }],
             checkCallback: (checking) => {
                 const view = this.app.workspace.getActiveViewOfType(NovelView);
