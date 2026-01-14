@@ -104,7 +104,9 @@ If your plugin does not need CSS, delete this file.
 
 /* State */
 
-.novel-property {}
+.novel-property {
+    vertical-align: middle;
+}
 
 .novel-property-key {
     font-weight: bolder;
@@ -114,6 +116,20 @@ If your plugin does not need CSS, delete this file.
 
 .novel-property-value {
     margin-inline-start: var(--size-4-1);
+}
+
+.novel-tag {
+    color: var(--text-accent);
+    background-color: hsla(var(--accent-h), var(--accent-s), var(--accent-l), 20%);
+    border-radius: var(--radius-l);
+    padding-block: var(--size-1-2);
+    padding-inline: var(--size-4-2);
+    font-size: small;
+    align-self: center;
+}
+
+.novel-tag::before {
+    content: "#"
 }
 
 /* Directions */
@@ -209,14 +225,25 @@ If your plugin does not need CSS, delete this file.
     --tag-color: var(--color-yellow);
     color: var(--tag-color);
 
-    text-transform: uppercase;
-
     & .novel-tagged-action-tag:not(.selected *) {
         display: none;
     }
 
     &::before {
         content: "🐈‍⬛"
+    }
+}
+
+.tag-vs {
+    --tag-color: var(--color-yellow);
+    color: var(--tag-color);
+
+    & .novel-tagged-action-tag:not(.selected *) {
+        display: none;
+    }
+
+    &::before {
+        content: "⚔️"
     }
 }
 
@@ -255,10 +282,14 @@ If your plugin does not need CSS, delete this file.
     height: 100%;
     padding: var(--size-4-2);
     box-sizing: border-box;
+    gap: var(--size-4-2);
 }
 
-.query-view-search {
-    margin-bottom: var(--size-4-2);
+.query-view-search {}
+
+.query-view-type-filter {
+    flex-grow: 0;
+    flex-shrink: 0;
 }
 
 .query-view-search input {
@@ -279,16 +310,20 @@ If your plugin does not need CSS, delete this file.
     border: var(--border-width) solid var(--background-modifier-border);
     border-radius: var(--radius-s);
     background-color: var(--background-secondary);
+
+    counter-reset: entry-no;
 }
 
 .query-result-entry {
-    font-size: var(--font-smallest);
+    font-size: var(--font-smaller);
     display: flex;
     text-decoration: none;
     color: inherit;
     padding: var(--size-2-2);
     border: var(--border-width) solid var(--background-modifier-border);
     vertical-align: middle;
+
+    counter-increment: entry-no;
 }
 
 .query-result-entry.scene {
@@ -296,6 +331,7 @@ If your plugin does not need CSS, delete this file.
 }
 
 .query-result-entry.item {
+    font-family: var(--font-monospace-theme), 'Courier Prime';
     gap: var(--size-4-1);
 }
 
@@ -321,11 +357,11 @@ If your plugin does not need CSS, delete this file.
 
 .query-result-entry.scene .title {
     font-weight: bold;
-    font-size: var(--font-smaller);
+    font-size: var(--font-small);
 
     &::before {
-        content: "🎬";
-        margin-right: 0.5em;
+        content: "🎬 " counter(entry-no) ". ";
+        white-space: pre-line;
     }
 }
 
@@ -338,9 +374,9 @@ If your plugin does not need CSS, delete this file.
     vertical-align: middle;
 }
 
-.scene-tagged-complete .title {
+.query-result-entry.scene.scene-tagged-complete .title {
     &::before {
-        content: "✓";
+        content: "✓ " counter(entry-no) ". ";
     }
 
     color: color-mix(in srgb,

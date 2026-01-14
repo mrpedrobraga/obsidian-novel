@@ -315,9 +315,24 @@ function novelDecorationsPluginFactory(app: App) {
                     // Property
                     const propertyMatch = /^(\w+):\s*(.+?)$/.exec(line.text);
                     if (propertyMatch) {
-                        const keyLen = 1 + (propertyMatch[1]?.length ?? 0);
+                        let key = propertyMatch[1]!;
+                        const keyLen = 1 + key.length;
                         builder.add(line.from, line.from + keyLen, Decoration.mark({ class: 'novel-property-key' }));
                         builder.add(line.from, line.to, Decoration.mark({ class: 'novel-property' }));
+
+                        if (key === "Tags") {
+                            let start = line.from + "Tags: ".length;
+                            const tagMatch = line.text.slice("Tags: ".length).matchAll(/(\w+),?\s*/g);
+                            if (tagMatch) {
+                                for (const tag of tagMatch) {
+                                    let from = start + tag.index;
+                                    let to = from + tag[1]!.length;
+
+                                    builder.add(from, to, Decoration.mark({ class: 'novel-tag' }))
+                                }
+                            }
+                        }
+
                         pos = line.to + 1;
                         continue;
                     }

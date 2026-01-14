@@ -4,6 +4,7 @@ import { IconName, Notice, View } from "obsidian";
 export const QUERY_VIEW_TYPE = "novel-query-view";
 
 export class QueryView extends View {
+    selectedQuerySource = "Scenes";
     resultsContainer: HTMLDivElement;
 
     getViewType(): string {
@@ -28,6 +29,19 @@ export class QueryView extends View {
             placeholder: "Enter your query...",
         });
 
+        const typeContainer = containerEl.createEl('select', { cls: 'query-view-type-filter' });
+        typeContainer.createEl('option', { text: "Scenes" });
+        typeContainer.createEl('option', { text: "BGM" });
+        typeContainer.createEl('option', { text: "VS" });
+        typeContainer.createEl('option', { text: "TRANS" });
+        typeContainer.createEl('option', { text: "SAVE" });
+        typeContainer.createEl('option', { text: "SFX" });
+        typeContainer.createEl('option', { text: "CHYRON" });
+        typeContainer.addEventListener('change', (e) => {
+            this.selectedQuerySource = (e.target as HTMLSelectElement).value;
+            this.updateResults();
+        })
+
         this.resultsContainer = containerEl.createDiv({ cls: "query-view-results" });
         this.resultsContainer.setText("Results will appear here.");
 
@@ -36,7 +50,6 @@ export class QueryView extends View {
         this.registerEvent(
             this.app.workspace.on("active-leaf-change", () => this.updateResults())
         );
-        this.updateResults();
     }
 
     async updateResults() {
@@ -45,7 +58,14 @@ export class QueryView extends View {
 
         if (view instanceof NovelView) {
             this.resultsContainer.empty();
-            this.updateWithItems(view);
+
+            if (this.selectedQuerySource == "Scenes") {
+                this.updateWithHeadings(view);
+            } else {
+
+                this.updateWithItems(view, this.selectedQuerySource);
+            }
+
         } else {
             this.resultsContainer.empty();
             this.resultsContainer.setText("No information for the open view.");
@@ -55,7 +75,7 @@ export class QueryView extends View {
     private updateWithHeadings(view: NovelView) {
         let headings = view.getHeadings();
         for (const heading of headings) {
-            const element = this.resultsContainer.createEl("a", { cls: "query-result-entry heading", href: "#" });
+            const element = this.resultsContainer.createEl("a", { cls: "query-result-entry scene", href: "#" });
             element.createDiv({ cls: 'title', text: `${heading.text}` });
             element.createDiv({ cls: 'summary', text: heading.metadata["Summary"] ?? 'No summary.' });
 
@@ -71,9 +91,27 @@ export class QueryView extends View {
         }
     }
 
-    private updateWithItems(view: NovelView) {
+    private updateWithItems(view: NovelView, type: string | null) {
+        const deduplicate = false;
+
         let items = view.getItems();
-        for (const item of items.filter(x => x.tag == "BGM")) {
+
+        // Filter by type
+        if (type) {
+            items = items.filter(item => item.tag == type);
+        }
+
+        // Deduplicate
+        if (deduplicate) {
+            const deduplicationSet = new Set();
+            items = items.filter(item => {
+                if (deduplicationSet.has(item.text)) return false;
+                deduplicationSet.add(item.text);
+                return true;
+            })
+        }
+
+        for (const item of items) {
             const element = this.resultsContainer.createEl("a", { cls: "query-result-entry item selected", href: "#" });
             element.createDiv({ cls: 'novel-tagged-action-tag', text: item.tag });
             element.createDiv({ cls: 'novel-tagged-action-text', text: item.text });
