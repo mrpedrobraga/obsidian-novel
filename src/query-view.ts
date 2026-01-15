@@ -1,4 +1,4 @@
-import { ActionLine, renderAsString, TaggedAction } from "novel-types";
+import { ActionLine, renderAsString, TaggedAction } from "parser/novel-types";
 import { NovelView } from "novel-view";
 import { IconName, View } from "obsidian";
 
@@ -143,7 +143,7 @@ export class QueryView extends View {
                         this.createTaggedActionEntryDOM(container, item, scroll);
                         break;
                     case "action":
-                        this.createActionEntryDOM(container, item, scroll);
+                        //this.createActionEntryDOM(container, item, scroll);
                         break;
                     case "speaker":
                         break;

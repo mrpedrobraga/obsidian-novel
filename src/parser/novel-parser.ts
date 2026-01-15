@@ -1,5 +1,5 @@
 import { Text } from '@codemirror/state';
-import { ActionLine, DocumentTextRange, NovelDocument, NovelScene, PropertyKey, PropertyValue, RichText, TaggedAction } from 'novel-types';
+import { ActionLine, DocumentTextRange, NovelDocument, NovelScene, PropertyKey, PropertyValue, RichText, TaggedAction } from 'parser/novel-types';
 
 type Success<T> = { success: true, value: T } | { success: false };
 function Success<T>(value: T): Success<T> { return { success: true, value } }
@@ -35,7 +35,7 @@ export function parseDocument(source: Text): Success<NovelDocument> {
         }
     }
 
-    // Parse scenes until you can't anymore.
+    // Takes scenes until you can't take it anymore.
     while (currentPosition < source.length) {
         if (source.lineAt(currentPosition).text.trim() == "") {
             currentPosition += 1;

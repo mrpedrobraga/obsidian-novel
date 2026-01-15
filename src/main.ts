@@ -85,7 +85,7 @@ export default class NovelPlugin extends Plugin {
 
         const updateInfoEl = (view: NovelView) => {
             const estimates = view.getEstimates();
-            infoEl.innerText = `Lines: ${estimates.lineCount}; Duration: ${Math.floor(estimates.duration.asMinutes())}min`;
+            infoEl.innerText = `${estimates.lineCount} lines for ${Math.floor(estimates.duration.asMinutes())}min runtime`;
             infoEl.style.display = "initial";
         };
 

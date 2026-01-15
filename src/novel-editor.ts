@@ -1,4 +1,4 @@
-import { App, TFile } from "obsidian";
+import { App, Notice, TFile } from "obsidian";
 import {
     EditorView,
     Decoration,
@@ -6,10 +6,71 @@ import {
     ViewUpdate,
     WidgetType,
     PluginValue,
+    scrollPastEnd,
+    keymap,
+    ViewPlugin,
 } from "@codemirror/view";
 import { RangeSetBuilder, EditorState, StateField, Transaction, Extension } from "@codemirror/state";
-import { DocumentTextRange } from "novel-types";
+import { DocumentTextRange } from "parser/novel-types";
 import { NovelView } from "novel-view";
+import { highlightSelectionMatches, search, searchKeymap } from "@codemirror/search";
+import { foldGutter, foldKeymap, foldService } from "@codemirror/language";
+import { closeBrackets } from "@codemirror/autocomplete";
+import path from "path";
+
+export function createEditor(view: NovelView, wrapper: HTMLDivElement): EditorView {
+    const editor = new EditorView({
+        state: EditorState.create({
+            doc: "",
+            extensions: extensions(view)
+        }),
+        parent: wrapper
+    });
+
+    editor.contentDOM.classList.add("cm-s-obsidian");
+    editor.contentDOM.setAttribute("spellcheck", "true");
+    editor.contentDOM.setAttribute("autocorrect", "on");
+    editor.contentDOM.setAttribute("autocomplete", "on");
+    editor.contentDOM.setAttribute("autocapitalize", "sentences");
+    return editor;
+}
+
+export function extensions(view: NovelView) {
+    return [
+        /* Features */
+        EditorView.lineWrapping,
+        scrollPastEnd(),
+        search({ top: true }),
+        keymap.of(searchKeymap),
+        highlightSelectionMatches(),
+        keymap.of(foldKeymap),
+        foldGutter({ openText: "▼", closedText: "▶" }),
+        closeBrackets(),
+
+        /* Editor */
+        EditorView.updateListener.of(update => {
+            if (update.docChanged) {
+                view.data = view.editor!.state.doc.toString();
+                view.requestSave();
+                view.requestUpdate();
+            };
+        }),
+
+        /* Language */
+        foldService.of((state: EditorState, lineStart: number) => {
+            const scene = view.sceneAtExact(state, lineStart);
+            if (!scene) return null;
+
+            return { from: state.doc.lineAt(scene.from).to, to: scene.to }
+        }
+        ),
+        foldService.of(propertyFoldService),
+        //novelDecorationsField(this),
+        ViewPlugin.fromClass(novelDecorationsPluginFromApp(view), {
+            decorations: v => v.decorations
+        }),
+    ];
+}
 
 export function novelDecorationsField(view: NovelView) {
     return StateField.define<DecorationSet>({
@@ -59,6 +120,7 @@ function buildDecorations(view: NovelView, state: EditorState, visibleRanges: Do
         while (pos <= to) {
             const line = state.doc.lineAt(pos);
             const lineHasCursor = selectionRanges.some(r => !(r.to < line.from || r.from > line.to));
+            const isSelectedClass = lineHasCursor ? 'selected' : '';
             const text = line.text.trim();
 
             if (!text) {
@@ -70,7 +132,6 @@ function buildDecorations(view: NovelView, state: EditorState, visibleRanges: Do
             // Scene Header
             const headerMatch = /^(==\s*)(.+?)(\s*==)$/.exec(line.text);
             if (headerMatch) {
-                const selectedClass = lineHasCursor ? 'selected' : '';
                 let tagClasses: string[] = [];
 
                 const scene = view.sceneAtExact(state, line.from);
@@ -79,7 +140,7 @@ function buildDecorations(view: NovelView, state: EditorState, visibleRanges: Do
                     tagClasses.push(`scene-tagged-${tag.trim().toLowerCase()}`);
                 }
 
-                builder.add(line.from, line.to, Decoration.mark({ class: `novel-scene-header ${selectedClass} ${tagClasses.join(" ")}` }));
+                builder.add(line.from, line.to, Decoration.mark({ class: `novel-scene-header ${isSelectedClass} ${tagClasses.join(" ")}` }));
                 builder.add(line.from, line.from + (headerMatch[1]?.length ?? 0), Decoration.mark({ class: 'hide' }));
                 builder.add(line.from + (headerMatch[1]?.length ?? 0) + (headerMatch[2]?.length ?? 0), line.to, Decoration.mark({ class: 'hide' }));
                 pos = line.to + 1;
@@ -90,7 +151,7 @@ function buildDecorations(view: NovelView, state: EditorState, visibleRanges: Do
             const commentMatch = /^(\/\/\s*)(.+)$/.exec(line.text);
             if (commentMatch) {
                 builder.add(line.from, line.from + (commentMatch[1]?.length ?? 0), Decoration.mark({ class: "hide" }));
-                builder.add(line.from, line.to, Decoration.mark({ class: lineHasCursor ? 'novel-comment selected' : 'novel-comment' }));
+                builder.add(line.from, line.to, Decoration.mark({ class: `novel-comment ${isSelectedClass}` }));
                 pos = line.to + 1;
                 continue;
             }
@@ -123,10 +184,26 @@ function buildDecorations(view: NovelView, state: EditorState, visibleRanges: Do
             // Tagged Action
             const tagMatch = /^@(\w+) (.+?)$/.exec(line.text);
             if (tagMatch) {
-                const tagLen = tagMatch[1]?.length ?? 0;
-                builder.add(line.from, line.from + 1 + tagLen, Decoration.mark({ class: `novel-tagged-action-tag` }));
-                builder.add(line.from, line.to, Decoration.mark({ class: `novel-tagged-action tag-${tagMatch[1]?.toLowerCase()} ${lineHasCursor ? 'selected' : ''}` }));
-                builder.add(line.from + 1 + tagLen + 1, line.to, Decoration.mark({ class: `novel-tagged-action-text` }));
+                const tag = tagMatch[1]!;
+                const content = tagMatch[2]!;
+                const tagLen = tag.length ?? 0;
+                const REFERENCE_REGEX = /\[\[(.+?)(?:\|(.+?))?\]\]$/;
+                const referenceMatch = content.match(REFERENCE_REGEX);
+
+                if (!lineHasCursor && (tag === 'BGM' || tag === 'SFX') && referenceMatch) {
+                    builder.add(
+                        line.from,
+                        line.to,
+                        Decoration.replace({
+                            block: false, widget: new PlaybackWidget(line.text, view.app, tag, referenceMatch[1]!, referenceMatch[2])
+                        })
+                    )
+                } else {
+                    builder.add(line.from, line.from + 1 + tagLen, Decoration.mark({ class: `novel-tagged-action-tag` }));
+                    builder.add(line.from, line.to, Decoration.mark({ class: `novel-tagged-action tag-${tag.toLowerCase()} ${isSelectedClass}` }));
+                    builder.add(line.from + 1 + tagLen + 1, line.to, Decoration.mark({ class: `novel-tagged-action-text` }));
+                }
+
                 pos = line.to + 1;
                 continue;
             }
@@ -157,7 +234,7 @@ function buildDecorations(view: NovelView, state: EditorState, visibleRanges: Do
                     const ref = speakerMatch[1] === '&' ? lastSpeaker.reference ?? "???" : speakerMatch[1] ?? "???";
                     const alias = speakerMatch[1] === '&' ? lastSpeaker.alias : speakerMatch[2];
                     builder.add(line.from, line.to, Decoration.replace({
-                        widget: new SpeakerWidget(view.app, speakerMatch, ref, alias ?? undefined, { contd: speakerMatch[1] === '&' })
+                        widget: new SpeakerWidget(view.app, view.file?.path ?? "/", speakerMatch, ref, alias ?? undefined, { contd: speakerMatch[1] === '&' })
                     }));
                     if (speakerMatch[1] !== '&') lastSpeaker = { reference: speakerMatch[1] ?? null, alias: speakerMatch[2] ?? null };
                 }
@@ -180,7 +257,7 @@ function buildDecorations(view: NovelView, state: EditorState, visibleRanges: Do
                 } else {
                     lineDeco.push({
                         from: start, to: end, value: Decoration.replace({
-                            widget: new ReferenceWidget(view.app, match as RegExpExecArray, match[1] ?? '[Broken Reference]', match[2])
+                            widget: new ReferenceWidget(view.app, view.file?.path ?? "/", match as RegExpExecArray, match[1] ?? '[Broken Reference]', match[2])
                         })
                     });
                 }
@@ -203,19 +280,42 @@ function buildDecorations(view: NovelView, state: EditorState, visibleRanges: Do
                 }
             }
 
+            // Formatting
+            const BOLD_REGEX = /\*\*([^\*]+?)\*\*/g;
+            for (const match of line.text.matchAll(BOLD_REGEX)) {
+                const start = line.from + match.index!;
+                const end = start + match[0].length;
+
+                lineDeco.push({ from: start, to: end, value: Decoration.mark({ class: 'bold' }) });
+                lineDeco.push({ from: start, to: start + 2, value: Decoration.mark({ class: 'hide' }) });
+                lineDeco.push({ from: start + match[1]!.length + 2, to: start + match[1]!.length + 4, value: Decoration.mark({ class: 'hide' }) });
+            }
+
+            const ITALIC_REGEX = /(?<!\*)\*([^\*]+?)\*/g;
+            for (const match of line.text.matchAll(ITALIC_REGEX)) {
+                const start = line.from + match.index!;
+                const end = start + match[0].length;
+
+                lineDeco.push({ from: start, to: end, value: Decoration.mark({ class: 'italic' }) });
+                lineDeco.push({ from: start, to: start + 1, value: Decoration.mark({ class: 'hide' }) });
+                lineDeco.push({ from: start + match[1]!.length + 1, to: start + match[1]!.length + 2, value: Decoration.mark({ class: 'hide' }) });
+            }
+
             if (inDialogue) {
+                const isParentheticalClass = /^\s*\(.*?\)\s*/.test(line.text) ? 'parenthetical' : '';
+
                 lineDeco.push({
                     from: line.from,
                     to: line.to,
                     value: Decoration.mark({
-                        class: /^\s*\(.*?\)\s*/.test(line.text) ? 'novel-dialogue parenthetical' : 'novel-dialogue'
+                        class: `novel-dialogue ${isParentheticalClass} ${isSelectedClass}`
                     })
                 })
             } else {
                 lineDeco.push({
                     from: line.from,
                     to: line.to,
-                    value: Decoration.mark({ class: 'novel-action-line' })
+                    value: Decoration.mark({ class: `novel-action-line ${isSelectedClass}` })
                 })
             }
 
@@ -239,26 +339,26 @@ function buildDecorations(view: NovelView, state: EditorState, visibleRanges: Do
 export type SpeakerOptions = { contd: boolean };
 
 export class SpeakerWidget extends WidgetType {
-    constructor(private app: App, private raw: RegExpExecArray, private reference: string, private alias?: string, private options?: SpeakerOptions) { super(); }
+    constructor(private app: App, private sourcePath: string, private raw: RegExpExecArray, private reference: string, private alias?: string, private options?: SpeakerOptions) { super(); }
 
     toDOM(view: EditorView): HTMLElement {
         const el = document.createElement("a");
         el.textContent = this.alias ?? this.reference;
         if (this.options?.contd) el.textContent += " (CONT'D)";
         el.classList.add("novel-speaker", "uppercase");
-        infuseWikilink(this.app, el, this.reference);
+        infuseWikilink(this.app, el, this.reference, this.sourcePath);
         return el;
     }
 }
 
 export class ReferenceWidget extends WidgetType {
-    constructor(private app: App, private raw: RegExpExecArray, private reference: string, private alias?: string) { super(); }
+    constructor(private app: App, private sourcePath: string, private raw: RegExpExecArray, private reference: string, private alias?: string) { super(); }
 
     toDOM(view: EditorView): HTMLElement {
         const el = document.createElement("a");
         el.textContent = this.alias ?? this.reference;
         el.classList.add("novel-wikilink");
-        infuseWikilink(this.app, el, this.reference);
+        infuseWikilink(this.app, el, this.reference, this.sourcePath);
         return el;
     }
 }
@@ -293,15 +393,50 @@ export class PromptWidget extends WidgetType {
     }
 }
 
-export function infuseWikilink(app: App, el: HTMLElement, path: string) {
+export class PlaybackWidget extends WidgetType {
+    constructor(private raw: string, private app: App, private tag: string, private text: string, private displayText?: string) {
+        super()
+    }
+
+    toDOM(view: EditorView): HTMLElement {
+        const widget = document.createElement('span');
+        widget.classList.add('novel-tagged-action');
+        widget.classList.add(`tag-${this.tag.toLowerCase()}`);
+
+        widget.createSpan({ cls: 'novel-tagged-action-tag', text: this.tag });
+
+        const mediaPath = this.text;
+        const displayText = this.displayText ?? path.parse(mediaPath).name;
+
+        const link = widget.createEl('a', { cls: 'novel-tagged-action-text', text: displayText });
+
+        link.classList.add('novel-tagged-action-link');
+        link.addEventListener('click', (e) => {
+            const view = this.app.workspace.getActiveViewOfType(NovelView);
+            if (!view) {
+                new Notice('No Novel view available.');
+                return;
+            }
+
+            view.playMedia(mediaPath);
+        });
+        link.addEventListener("mouseover", e => {
+            this.app.workspace.trigger('hover-link', { event: e, source: 'novel', hoverParent: widget, targetEl: link, linktext: mediaPath });
+        });
+
+        return widget;
+    }
+}
+
+export function infuseWikilink(app: App, el: HTMLElement, targetPath: string, sourcePath: string) {
     el.addEventListener("click", async e => {
         e.preventDefault(); e.stopPropagation();
-        const target = app.vault.getAbstractFileByPath(path);
+        const target = app.metadataCache.getFirstLinkpathDest(targetPath, sourcePath);
         if (target) app.workspace.getLeaf(false).openFile(target as TFile);
-        else app.vault.create(`${path}.md`, "").then(f => app.workspace.getLeaf(true).openFile(f));
+        else app.vault.create(`${targetPath}.md`, "").then(f => app.workspace.getLeaf(true).openFile(f));
     });
     el.addEventListener("mouseover", e => {
-        app.workspace.trigger('hover-link', { event: e, source: 'novel', hoverParent: el, targetEl: el, linktext: path });
+        app.workspace.trigger('hover-link', { event: e, source: 'novel', hoverParent: el, targetEl: el, linktext: targetPath });
     });
 }
 

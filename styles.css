@@ -7,6 +7,18 @@ If your plugin does not need CSS, delete this file.
 
 */
 
+.novel-wrapper {
+    display: flex;
+    flex-direction: column;
+}
+
+.novel-playback {
+    display: flex;
+    flex-direction: row;
+    height: fit-content;
+    padding: var(--size-4-1);
+}
+
 .novel-title-input {
     background: transparent;
     border: none;
@@ -77,6 +89,21 @@ If your plugin does not need CSS, delete this file.
 .novel-action-line {
     font-style: italic;
     font-family: var(--font-monospace-theme), 'Courier Prime';
+    vertical-align: middle;
+}
+
+.bold {
+    font-weight: bolder;
+    color: var(--color-red);
+}
+
+.italic {
+    font-style: italic;
+    color: var(--color-yellow);
+}
+
+.novel-action-line .italic {
+    font-style: normal;
 }
 
 .uppercase {
@@ -158,6 +185,10 @@ If your plugin does not need CSS, delete this file.
     justify-content: end;
     width: 100%;
     font-family: var(--font-monospace-theme), 'Courier Prime';
+}
+
+.novel-tagged-action .novel-tagged-action-link {
+    color: inherit;
 }
 
 .novel-tagged-action .novel-tagged-action-tag {

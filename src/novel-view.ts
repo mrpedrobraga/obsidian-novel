@@ -1,38 +1,18 @@
-import { debounce, Debouncer, Notice, TextFileView, TFile, WorkspaceLeaf } from "obsidian";
+import { debounce, Debouncer, Notice, TextFileView, WorkspaceLeaf } from "obsidian";
 import {
     EditorView,
-    scrollPastEnd,
-    ViewPlugin,
 } from "@codemirror/view";
 import { EditorState } from "@codemirror/state";
 import {
-    search,
-    searchKeymap,
-    highlightSelectionMatches,
     openSearchPanel
 } from "@codemirror/search";
-import { keymap } from "@codemirror/view";
-import { foldGutter, foldKeymap, foldService } from "@codemirror/language";
 import { QUERY_VIEW_TYPE } from "query-view";
-import { novelDecorationsField, novelDecorationsPluginFromApp, novelFoldService, propertyFoldService } from "novel-editor";
-import { DocumentTextRange, Metadata, NovelDocument, NovelScene } from "novel-types";
-import { parseDocument } from "novel-parser";
+import { DocumentTextRange, Metadata, NovelDocument, NovelScene } from "parser/novel-types";
+import { parseDocument } from "parser/novel-parser";
 import moment from "moment";
+import { createEditor } from "novel-editor";
 
 export const NOVEL_VIEW_TYPE = "novel";
-
-interface HeadingInfo {
-    level: number;
-    text: string;
-    position: number;
-    metadata: Record<string, string>
-}
-
-interface ItemInfo {
-    tag: string,
-    text: string,
-    position: number,
-}
 
 interface NovelViewOptions {
     infoEl: HTMLElement
@@ -40,6 +20,8 @@ interface NovelViewOptions {
 
 export class NovelView extends TextFileView {
     editor: EditorView | null = null;
+    playback: HTMLDivElement;
+    audio: HTMLAudioElement;
     structure: NovelDocument | null = null;
     requestUpdate: Debouncer<[], void>;
 
@@ -64,9 +46,15 @@ export class NovelView extends TextFileView {
     protected async onOpen(): Promise<void> {
         this.contentEl.empty();
         this.contentEl.classList.add("novel-view");
-        const wrapper = this.contentEl.createDiv("markdown-source-view mod-cm6");
+        const wrapper = this.contentEl.createDiv("markdown-source-view mod-cm6 novel-wrapper");
 
-        this.createEditor(wrapper);
+        // Editor
+        this.editor = createEditor(this, wrapper);
+
+        // Playback
+        this.playback = wrapper.createEl('div', { cls: "novel-playback" });
+        this.audio = this.playback.createEl("audio");
+        this.audio.setAttribute('controls', 'true');
 
         this.addAction("search", "Query", async (evt) => {
             const leaf = this.app.workspace.getRightLeaf(false);
@@ -79,57 +67,6 @@ export class NovelView extends TextFileView {
         })
 
         await super.onOpen();
-    }
-
-    private createEditor(wrapper: HTMLDivElement) {
-        this.editor = new EditorView({
-            state: EditorState.create({
-                doc: "",
-                extensions: this.getExtensions()
-            }),
-            parent: wrapper
-        });
-
-        this.editor.contentDOM.classList.add("cm-s-obsidian");
-        this.editor.contentDOM.setAttribute("spellcheck", "true");
-        this.editor.contentDOM.setAttribute("autocorrect", "on");
-        this.editor.contentDOM.setAttribute("autocomplete", "on");
-        this.editor.contentDOM.setAttribute("autocapitalize", "sentences");
-    }
-
-    private getExtensions() {
-        return [
-            /* Features */
-            EditorView.lineWrapping,
-            scrollPastEnd(),
-            search({ top: true }),
-            keymap.of(searchKeymap),
-            highlightSelectionMatches(),
-            keymap.of(foldKeymap),
-            foldGutter({ openText: "▼", closedText: "▶" }),
-            /* Editor */
-            EditorView.updateListener.of(update => {
-                if (update.docChanged) {
-                    this.data = this.editor!.state.doc.toString();
-                    this.requestSave();
-                    this.requestUpdate();
-                };
-            }),
-
-            /* Language */
-            foldService.of((state: EditorState, lineStart: number) => {
-                const scene = this.sceneAtExact(state, lineStart);
-                if (!scene) return null;
-
-                return { from: state.doc.lineAt(scene.from).to, to: scene.to }
-            }
-            ),
-            foldService.of(propertyFoldService),
-            //novelDecorationsField(this),
-            ViewPlugin.fromClass(novelDecorationsPluginFromApp(this), {
-                decorations: v => v.decorations
-            }),
-        ];
     }
 
     getViewData(): string {
@@ -167,6 +104,25 @@ export class NovelView extends TextFileView {
 
     openSearch() {
         this.editor && openSearchPanel(this.editor);
+    }
+
+    playMedia(media: string) {
+        const file = this.app.metadataCache.getFirstLinkpathDest(media, this.file?.path ?? '');
+        if (file) {
+            const AUDIO_FILES = ["mp3", "ogg", "opus"];
+
+            if (AUDIO_FILES.contains(file.extension)) {
+                const url = this.app.vault.getResourcePath(file);
+                this.audio.setAttribute('src', url);
+                this.audio.play();
+                return;
+            }
+
+            new Notice(`The file format '${file.extension}' is not supported.`)
+
+        } else {
+            new Notice(`No media found with path '${media}'.`)
+        }
     }
 
     scrollTo(position: number) {
