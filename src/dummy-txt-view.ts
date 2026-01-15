@@ -19,15 +19,6 @@ export class DummyView extends TextFileView {
         return TXT_VIEW_TYPE;
     }
 
-    async onLoadFile(file: TFile) {
-        this.file = file;
-        this.data = await this.app.vault.read(file);
-
-        this.editor.dispatch({
-            changes: { from: 0, to: this.editor.state.doc.length, insert: this.data }
-        });
-    }
-
     getViewData(): string {
         return this.data;
     }
@@ -63,15 +54,7 @@ export class DummyView extends TextFileView {
                 ]
             })
         });
-    }
 
-    /** Optional: clean up */
-    async onClose() {
-        this.editor.destroy();
-    }
-
-    async save(clear?: boolean) {
-        if (!this.file) return;
-        return this.app.vault.modify(this.file, this.data)
+        await super.onOpen();
     }
 }

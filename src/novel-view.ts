@@ -72,6 +72,8 @@ export class NovelView extends TextFileView {
             });
             this.app.workspace.revealLeaf(leaf);
         })
+
+        await super.onOpen();
     }
 
     private createEditor(wrapper: HTMLDivElement) {
@@ -114,7 +116,7 @@ export class NovelView extends TextFileView {
                 const scene = this.sceneAtExact(state, lineStart);
                 if (!scene) return null;
 
-                return { from: scene.from + `== ${scene.name} ==`.length, to: scene.to }
+                return { from: state.doc.lineAt(scene.from).to, to: scene.to }
             }
             ),
             foldService.of(propertyFoldService),
@@ -130,18 +132,8 @@ export class NovelView extends TextFileView {
 
     async setViewData(data: string, clear: boolean) {
         this.data = data;
-
-        if (!this.editor) return;
-
-        const changes = clear
-            ? { from: 0, to: this.editor.state.doc.length, insert: "" }
-            : { from: 0, to: this.editor.state.doc.length, insert: data };
-
-        this.editor.dispatch({ changes });
-
-        if (data == "") return;
-
-        this.rebuildStructure();
+        this.editor && this.editor.dispatch({ changes: { from: 0, to: this.editor.state.doc.length, insert: this.data } });
+        if (this.data != "") this.rebuildStructure();
     }
 
     private rebuildStructure() {
@@ -153,45 +145,14 @@ export class NovelView extends TextFileView {
             const parseResult = parseDocument(this.editor.state.doc);
             if (parseResult.success) {
                 this.structure = parseResult.value;
-                console.log(parseResult.value, null, " ");
+                // console.log(parseResult.value, null, " ");
             }
         } catch (e) {
             console.error(e);
         }
     }
 
-    clear(): void {
-        if (!this.editor) return;
-
-        this.editor.setState(EditorState.create({
-            doc: "",
-            extensions: this.getExtensions()
-        }));
-    }
-
-    async onLoadFile(file: TFile): Promise<void> {
-        this.file = file;
-        const data = await this.app.vault.read(file);
-        await this.setViewData(data, false);
-    }
-
-    async onUnloadFile(file: TFile): Promise<void> {
-        this.file = null;
-        const data = "";
-        await this.setViewData(data, true);
-    }
-
-    async save(clear?: boolean) {
-        if (!this.file) return;
-        return await this.app.vault.modify(this.file, this.getViewData())
-    }
-
-    protected async onClose(): Promise<void> {
-        super.onClose();
-        this.save();
-        this.editor?.destroy();
-        this.editor = null;
-    }
+    clear(): void { }
 
     openSearch() {
         this.editor && openSearchPanel(this.editor);

@@ -113,14 +113,16 @@ export function parseScene(source: Text, position: number): Success<NovelScene> 
 
     while (currentPosition < source.length) {
         const line = source.lineAt(currentPosition);
-        console.log(line.text);
 
-        if (line.text[0] == "=") break;
+        // If the line is the start of a new scene, we stop.
+        if (line.text[0] == "=") {
+            currentPosition -= 1;
+            break;
+        };
 
         // Try parse tagged action.
         const parseTaggedActionResult = parseTaggedAction(source, currentPosition);
         if (parseTaggedActionResult.success) {
-            console.log(parseTaggedActionResult.value)
             scene.items.push({ t: "taggedAction", ...parseTaggedActionResult.value })
             currentPosition = parseTaggedActionResult.value.to + 2;
             continue;
@@ -139,7 +141,7 @@ export function parseScene(source: Text, position: number): Success<NovelScene> 
         advanceLine()
     }
 
-    scene.to = currentPosition - 1;
+    scene.to = currentPosition;
 
     return Success(scene);
 }
