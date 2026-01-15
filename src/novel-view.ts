@@ -14,7 +14,7 @@ import {
 import { keymap } from "@codemirror/view";
 import { foldGutter, foldKeymap, foldService } from "@codemirror/language";
 import { QUERY_VIEW_TYPE } from "query-view";
-import { novelDecorationsPluginFactory, novelFoldService, propertyFoldService } from "novel-editor";
+import { novelDecorationsField, novelDecorationsPluginFromApp, novelFoldService, propertyFoldService } from "novel-editor";
 import { DocumentTextRange, Metadata, NovelDocument, NovelScene } from "novel-types";
 import { parseDocument } from "novel-parser";
 
@@ -120,7 +120,8 @@ export class NovelView extends TextFileView {
             }
             ),
             foldService.of(propertyFoldService),
-            ViewPlugin.fromClass(novelDecorationsPluginFactory(this.app), {
+            //novelDecorationsField(this),
+            ViewPlugin.fromClass(novelDecorationsPluginFromApp(this), {
                 decorations: v => v.decorations
             }),
         ];

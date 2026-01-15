@@ -29,7 +29,7 @@ export function parseDocument(source: Text): Success<NovelDocument> {
         let property = parseProperty(source, currentPosition);
         if (property.success) {
             script.metadata[property.value[0]] = property.value[1]
-            currentPosition = property.value[2].to + 2;
+            currentPosition = property.value[2].to + 1;
         } else {
             break;
         }
@@ -48,7 +48,7 @@ export function parseDocument(source: Text): Success<NovelDocument> {
         if (parseSceneResult.success) {
             const scene = parseSceneResult.value;
             script.scenes.push(scene);
-            currentPosition = scene.to + 2;
+            currentPosition = scene.to + 1;
         } else {
             source.lineAt(currentPosition).to
             advanceLine()
@@ -91,13 +91,13 @@ export function parseScene(source: Text, position: number): Success<NovelScene> 
     let currentPosition = position + match[0].length + 1;
     function advanceLine() {
         let currentLineEnd = source.lineAt(currentPosition).to;
-        // `to` is inclusive, so i add 1 to get to the next character, then 1 to skip it (cuz it's a newline)
-        currentPosition = Math.min(source.length, currentLineEnd + 2);
+        currentPosition = Math.min(source.length, currentLineEnd + 1);
     }
 
     // Parse properties for the document.
     while (currentPosition < source.length) {
-        if (source.lineAt(currentPosition).text.trim() == "") {
+        if (source.lineAt(currentPosition).text == "\n") {
+            advanceLine();
             currentPosition += 1;
             continue;
         }
@@ -105,7 +105,7 @@ export function parseScene(source: Text, position: number): Success<NovelScene> 
         let property = parseProperty(source, currentPosition);
         if (property.success) {
             scene.metadata[property.value[0]] = property.value[1]
-            currentPosition = property.value[2].to + 2;
+            currentPosition = property.value[2].to + 1;
         } else {
             break;
         }

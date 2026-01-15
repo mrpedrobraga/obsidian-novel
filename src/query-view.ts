@@ -1,4 +1,4 @@
-import { renderAsString } from "novel-types";
+import { ActionLine, renderAsString, TaggedAction } from "novel-types";
 import { NovelView } from "novel-view";
 import { IconName, View } from "obsidian";
 
@@ -104,37 +104,75 @@ export class QueryView extends View {
     }
 
     private updateWithItems(view: NovelView, type: string | null) {
+        const grouped = true;
+
         const deduplicate = false;
+        const deduplicationSet = new Set();
 
-        let items = view.getScenes().flatMap(scene => scene.items).filter(x => x.t == "taggedAction");
+        let container: HTMLElement;
 
-        // Filter by type
-        if (type) {
-            items = items.filter(item => item.tag == type);
-        }
+        for (const scene of view.getScenes()) {
+            if (grouped) {
+                container = this.resultsContainer.createEl('fieldset', { cls: 'query-result-group' });
+                container.createEl('legend', { text: scene.name });
+            } else {
+                container = this.resultsContainer;
+            }
 
-        // Deduplicate
-        if (deduplicate) {
-            const deduplicationSet = new Set();
-            items = items.filter(item => {
-                const asString = renderAsString(item.content);
-                if (deduplicationSet.has(asString)) return false;
-                deduplicationSet.add(asString);
+            const items = scene.items.filter(item => {
+                if (type && item.t === "taggedAction" && item.tag !== type) return false;
+
+                if (deduplicate && item.t === "taggedAction") {
+                    const key = renderAsString(item.content);
+                    if (deduplicationSet.has(key)) return false;
+                    deduplicationSet.add(key);
+                }
+
                 return true;
-            })
-        }
+            });
 
-        for (const item of items) {
-            const element = this.resultsContainer.createEl("a", { cls: "query-result-entry item selected", href: "#" });
-            element.createDiv({ cls: 'novel-tagged-action-tag', text: item.tag });
-            element.createDiv({ cls: 'novel-tagged-action-text', text: renderAsString(item.content) });
-            element.classList.add(`tag-${item.tag.trim().toLowerCase()}`)
-
-            element.addEventListener('mousedown', (evt) => {
+            let scroll = (position: number) => (evt: Event) => {
                 evt.preventDefault();
                 evt.stopPropagation();
-                view.scrollTo(item.from);
-            });
+                view.scrollTo(position);
+            };
+
+            for (const item of items) {
+                switch (item.t) {
+                    case "taggedAction":
+                        this.createTaggedActionEntryDOM(container, item, scroll);
+                        break;
+                    case "action":
+                        this.createActionEntryDOM(container, item, scroll);
+                        break;
+                    case "speaker":
+                        break;
+                    case "dialogue":
+                        break;
+                }
+            }
+
+            if (grouped && container.childElementCount == 1) {
+                this.resultsContainer.removeChild(container);
+            }
         }
     }
+
+    private createActionEntryDOM(container: HTMLElement, item: ActionLine, scroll: ScrollCallback) {
+        const element = container.createEl("a", { cls: "query-result-entry item", href: "#" });
+        element.createDiv({ cls: 'novel-action-line', text: renderAsString(item.content) });
+
+        element.addEventListener('mousedown', scroll(item.from));
+    }
+
+    private createTaggedActionEntryDOM(container: HTMLElement, item: TaggedAction, scroll: ScrollCallback) {
+        const element = container.createEl("a", { cls: "query-result-entry item selected", href: "#" });
+        element.createDiv({ cls: 'novel-tagged-action-tag', text: item.tag });
+        element.createDiv({ cls: 'novel-tagged-action-text', text: renderAsString(item.content) });
+        element.classList.add(`tag-${item.tag.trim().toLowerCase()}`);
+
+        element.addEventListener('mousedown', scroll(item.from));
+    }
 }
+
+type ScrollCallback = (position: number) => (event: Event) => void;

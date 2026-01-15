@@ -57,6 +57,14 @@ If your plugin does not need CSS, delete this file.
     margin-inline-end: var(--size-4-2);
 }
 
+.novel-view .novel-scene-header.scene-tagged-complete {
+    color: var(--color-green);
+}
+
+.novel-view .novel-scene-header.scene-tagged-complete::before {
+    content: "✓";
+}
+
 .novel-action-line {
     font-style: italic;
     font-family: var(--font-monospace-theme), 'Courier Prime';
@@ -310,8 +318,27 @@ If your plugin does not need CSS, delete this file.
     border: var(--border-width) solid var(--background-modifier-border);
     border-radius: var(--radius-s);
     background-color: var(--background-secondary);
+    scrollbar-gutter: stable;
 
     counter-reset: entry-no;
+}
+
+.query-result-group {
+    background-color: var(--background-primary-alt);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-s);
+    padding: var(--size-4-2);
+
+    display: flex;
+    flex-direction: column;
+    gap: var(--size-4-2);
+
+    & legend {
+        float: left;
+        font-size: var(--font-smallest);
+        font-variant: small-caps;
+        text-transform: lowercase;
+    }
 }
 
 .query-result-entry {
@@ -333,6 +360,10 @@ If your plugin does not need CSS, delete this file.
 .query-result-entry.item {
     font-family: var(--font-monospace-theme), 'Courier Prime';
     gap: var(--size-4-1);
+
+    & .novel-tagged-action-tag {
+        font-weight: bolder;
+    }
 }
 
 .query-result-entry::before {
