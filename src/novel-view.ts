@@ -56,6 +56,8 @@ export class NovelView extends TextFileView {
         this.audio = this.playback.createEl("audio");
         this.audio.setAttribute('controls', 'true');
 
+        this.playback.style.display = "none";
+
         this.addAction("search", "Query", async (evt) => {
             const leaf = this.app.workspace.getRightLeaf(false);
             if (!leaf) return;
@@ -107,6 +109,8 @@ export class NovelView extends TextFileView {
     }
 
     playMedia(media: string) {
+        this.playback.style.display = "unset";
+
         const file = this.app.metadataCache.getFirstLinkpathDest(media, this.file?.path ?? '');
         if (file) {
             const AUDIO_FILES = ["mp3", "ogg", "opus"];
