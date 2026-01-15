@@ -79,6 +79,32 @@ export default class NovelPlugin extends Plugin {
                 return true;
             }
         });
+
+        const infoEl = this.addStatusBarItem();
+        infoEl.createSpan({ text: "--" });
+
+        const updateInfoEl = (view: NovelView) => {
+            const estimates = view.getEstimates();
+            infoEl.innerText = `Lines: ${estimates.lineCount}; Duration: ${Math.floor(estimates.duration.asMinutes())}min`;
+            infoEl.style.display = "initial";
+        };
+
+        let previousInterval: number | undefined = undefined;
+
+        this.registerEvent(this.app.workspace.on('active-leaf-change', (leaf) => {
+            if (leaf?.view instanceof NovelView) {
+                const view = leaf.view as NovelView;
+                if (previousInterval) {
+                    window.clearInterval(previousInterval);
+                }
+                const interval = window.setInterval(() => updateInfoEl(view), 2000);
+                previousInterval = interval;
+                view.registerInterval(interval);
+                updateInfoEl(view);
+            } else {
+                infoEl.style.display = "none";
+            }
+        }));
     }
 
     private registerTxtView() {

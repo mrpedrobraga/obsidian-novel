@@ -17,6 +17,7 @@ import { QUERY_VIEW_TYPE } from "query-view";
 import { novelDecorationsField, novelDecorationsPluginFromApp, novelFoldService, propertyFoldService } from "novel-editor";
 import { DocumentTextRange, Metadata, NovelDocument, NovelScene } from "novel-types";
 import { parseDocument } from "novel-parser";
+import moment from "moment";
 
 export const NOVEL_VIEW_TYPE = "novel";
 
@@ -33,15 +34,19 @@ interface ItemInfo {
     position: number,
 }
 
+interface NovelViewOptions {
+    infoEl: HTMLElement
+}
+
 export class NovelView extends TextFileView {
     editor: EditorView | null = null;
     structure: NovelDocument | null = null;
-    rebuildStructureDb: Debouncer<[], void>;
+    requestUpdate: Debouncer<[], void>;
 
     constructor(leaf: WorkspaceLeaf) {
         super(leaf);
 
-        this.rebuildStructureDb = debounce(this.rebuildStructure, 2000);
+        this.requestUpdate = debounce(this.update, 2000);
     }
 
     canAcceptExtension(extension: string): boolean {
@@ -107,7 +112,7 @@ export class NovelView extends TextFileView {
                 if (update.docChanged) {
                     this.data = this.editor!.state.doc.toString();
                     this.requestSave();
-                    this.rebuildStructureDb();
+                    this.requestUpdate();
                 };
             }),
 
@@ -134,7 +139,12 @@ export class NovelView extends TextFileView {
     async setViewData(data: string, clear: boolean) {
         this.data = data;
         this.editor && this.editor.dispatch({ changes: { from: 0, to: this.editor.state.doc.length, insert: this.data } });
-        if (this.data != "") this.rebuildStructure();
+        this.update();
+    }
+
+    private update() {
+
+        this.rebuildStructure();
     }
 
     private rebuildStructure() {
@@ -176,6 +186,16 @@ export class NovelView extends TextFileView {
         this.editor.focus();
     }
 
+    getEstimates() {
+        const lineCount = this.editor?.state.doc.lines ?? 0;
+        const duration = moment.duration(lineCount * 1 / 50, 'minutes');
+
+        return {
+            lineCount,
+            duration,
+        }
+    }
+
     getMetadata(): Metadata {
         return this.structure?.metadata ?? {};
     }
@@ -185,7 +205,7 @@ export class NovelView extends TextFileView {
         return this.structure.scenes;
     }
 
-    getSceneRangeAt(position: number): DocumentTextRange | null {
+    sceneRangeAt(position: number): DocumentTextRange | null {
         const scene = this.sceneAt(position);
         if (!scene) return null;
         return scene as DocumentTextRange;

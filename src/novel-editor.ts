@@ -167,18 +167,18 @@ function buildDecorations(view: NovelView, state: EditorState, visibleRanges: Do
 
             // Dialogue / Action fallback
 
-            const inlineDeco: { from: number, to: number, value: Decoration }[] = [];
+            const lineDeco: { from: number, to: number, value: Decoration }[] = [];
 
             // Wikilinks
-            const WIKILINK_REGEX = /\[\[(.+?)(?:\|(.+?))?\]\]/g;
+            const WIKILINK_REGEX = /\[\[([^\]]+?)(?:\|([^\]]+?))?\]\]/g;
             for (const match of line.text.matchAll(WIKILINK_REGEX)) {
                 const start = line.from + match.index!;
                 const end = start + match[0].length;
 
                 if (lineHasCursor) {
-                    inlineDeco.push({ from: start, to: end, value: Decoration.mark({ class: 'novel-wikilink' }) })
+                    lineDeco.push({ from: start, to: end, value: Decoration.mark({ class: 'novel-wikilink' }) })
                 } else {
-                    inlineDeco.push({
+                    lineDeco.push({
                         from: start, to: end, value: Decoration.replace({
                             widget: new ReferenceWidget(view.app, match as RegExpExecArray, match[1] ?? '[Broken Reference]', match[2])
                         })
@@ -186,17 +186,48 @@ function buildDecorations(view: NovelView, state: EditorState, visibleRanges: Do
                 }
             }
 
-            inlineDeco.filter(deco => deco.from <= line.from).forEach(deco => builder.add(deco.from, deco.to, deco.value));
+            // Links
+            const LINK_REGEX = /\[([^\]]+?)\](?:\(([^\)]+?)\))/g;
+            for (const match of line.text.matchAll(LINK_REGEX)) {
+                const start = line.from + match.index!;
+                const end = start + match[0].length;
 
-            if (inDialogue) {
-                builder.add(line.from, line.to, Decoration.mark({
-                    class: /^\s*\(.*?\)\s*/.test(line.text) ? 'novel-dialogue parenthetical' : 'novel-dialogue'
-                }));
-            } else {
-                builder.add(line.from, line.to, Decoration.mark({ class: 'novel-action-line' }));
+                if (lineHasCursor) {
+                    lineDeco.push({ from: start, to: end, value: Decoration.mark({ class: 'novel-wikilink' }) })
+                } else {
+                    lineDeco.push({
+                        from: start, to: end, value: Decoration.replace({
+                            widget: new LinkWidget(view.app, match as RegExpExecArray, match[2] ?? '#', match[1])
+                        })
+                    });
+                }
             }
 
-            inlineDeco.filter(deco => deco.from > line.from).forEach(deco => builder.add(deco.from, deco.to, deco.value));
+            if (inDialogue) {
+                lineDeco.push({
+                    from: line.from,
+                    to: line.to,
+                    value: Decoration.mark({
+                        class: /^\s*\(.*?\)\s*/.test(line.text) ? 'novel-dialogue parenthetical' : 'novel-dialogue'
+                    })
+                })
+            } else {
+                lineDeco.push({
+                    from: line.from,
+                    to: line.to,
+                    value: Decoration.mark({ class: 'novel-action-line' })
+                })
+            }
+
+            lineDeco.sort((a, b) => {
+                if (a.from == b.from) {
+                    return 0;
+                } else {
+                    return a.from - b.from;
+                }
+            });
+            lineDeco
+                .forEach(deco => builder.add(deco.from, deco.to, deco.value));
 
             pos = line.to + 1;
         }
@@ -232,6 +263,20 @@ export class ReferenceWidget extends WidgetType {
     }
 }
 
+export class LinkWidget extends WidgetType {
+    constructor(private app: App, private raw: RegExpExecArray, private reference: string, private alias?: string) { super(); }
+
+    toDOM(view: EditorView): HTMLElement {
+        const el = document.createElement("a");
+        el.href = this.reference;
+        el.target = "_blank";
+        el.textContent = this.alias ?? this.reference;
+        el.classList.add("novel-wikilink");
+        infuseLink(this.app, el, this.reference);
+        return el;
+    }
+}
+
 export class PromptWidget extends WidgetType {
     constructor(private raw: string, private prompts: string[]) { super(); }
 
@@ -259,6 +304,11 @@ export function infuseWikilink(app: App, el: HTMLElement, path: string) {
         app.workspace.trigger('hover-link', { event: e, source: 'novel', hoverParent: el, targetEl: el, linktext: path });
     });
 }
+
+export function infuseLink(app: App, el: HTMLElement, path: string) {
+
+}
+
 
 // Folding Services
 export function novelFoldService(state: EditorState, lineStart: number) {

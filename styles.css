@@ -59,11 +59,20 @@ If your plugin does not need CSS, delete this file.
 
 .novel-view .novel-scene-header.scene-tagged-complete {
     color: var(--color-green);
+
+    &::before {
+        content: "✓";
+    }
 }
 
-.novel-view .novel-scene-header.scene-tagged-complete::before {
-    content: "✓";
+.novel-view .novel-scene-header.scene-tagged-boss {
+    color: var(--color-yellow);
+
+    &::before {
+        content: "👑";
+    }
 }
+
 
 .novel-action-line {
     font-style: italic;
@@ -403,6 +412,7 @@ If your plugin does not need CSS, delete this file.
     text-overflow: ellipsis;
     white-space: nowrap;
     vertical-align: middle;
+    display: none;
 }
 
 .query-result-entry.scene.scene-tagged-complete .title {
@@ -412,6 +422,18 @@ If your plugin does not need CSS, delete this file.
 
     color: color-mix(in srgb,
         var(--color-green) 80%,
+        var(--text-normal));
+    ;
+    font-weight: bold;
+}
+
+.query-result-entry.scene.scene-tagged-boss .title {
+    &::before {
+        content: "👑 " counter(entry-no) ". ";
+    }
+
+    color: color-mix(in srgb,
+        var(--color-yellow) 80%,
         var(--text-normal));
     ;
     font-weight: bold;
