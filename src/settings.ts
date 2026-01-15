@@ -2,11 +2,11 @@ import { App, PluginSettingTab, Setting } from "obsidian";
 import NovelPlugin from "./main";
 
 export interface NovelSettings {
-    mySetting: string;
+    testSetting: string;
 }
 
 export const DEFAULT_SETTINGS: NovelSettings = {
-    mySetting: 'default'
+    testSetting: 'default'
 }
 
 export class SampleSettingTab extends PluginSettingTab {
@@ -23,13 +23,13 @@ export class SampleSettingTab extends PluginSettingTab {
         containerEl.empty();
 
         new Setting(containerEl)
-            .setName('Settings #1')
-            .setDesc('It\'s a secret')
+            .setName('Example Setting')
+            .setDesc('A simple setting to test the setting capabilities.')
             .addText(text => text
-                .setPlaceholder('Enter your secret')
-                .setValue(this.plugin.settings.mySetting)
+                .setPlaceholder('Insert placeholder here...')
+                .setValue(this.plugin.settings.testSetting)
                 .onChange(async (value) => {
-                    this.plugin.settings.mySetting = value;
+                    this.plugin.settings.testSetting = value;
                     await this.plugin.saveSettings();
                 }));
     }

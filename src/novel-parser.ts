@@ -124,7 +124,7 @@ export function parseScene(source: Text, position: number): Success<NovelScene> 
         const parseTaggedActionResult = parseTaggedAction(source, currentPosition);
         if (parseTaggedActionResult.success) {
             scene.items.push({ t: "taggedAction", ...parseTaggedActionResult.value })
-            currentPosition = parseTaggedActionResult.value.to + 2;
+            currentPosition = parseTaggedActionResult.value.to + 1;
             continue;
         }
 

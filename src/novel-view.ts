@@ -85,11 +85,11 @@ export class NovelView extends TextFileView {
             parent: wrapper
         });
 
-        this.editor.dom.classList.add("cm-s-obsidian");
-        this.editor.dom.setAttribute("spellcheck", "true");
-        this.editor.dom.setAttribute("autocorrect", "on");
-        this.editor.dom.setAttribute("autocomplete", "on");
-        this.editor.dom.setAttribute("autocapitalize", "sentences");
+        this.editor.contentDOM.classList.add("cm-s-obsidian");
+        this.editor.contentDOM.setAttribute("spellcheck", "true");
+        this.editor.contentDOM.setAttribute("autocorrect", "on");
+        this.editor.contentDOM.setAttribute("autocomplete", "on");
+        this.editor.contentDOM.setAttribute("autocapitalize", "sentences");
     }
 
     private getExtensions() {
