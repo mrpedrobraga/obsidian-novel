@@ -162,7 +162,7 @@ export class NovelView extends TextFileView {
 
     getScenes(): NovelScene[] {
         if (!this.structure) return [];
-        return this.structure.scenes;
+        return this.structure.scenes();
     }
 
     sceneRangeAt(position: number): DocumentTextRange | null {
@@ -172,11 +172,11 @@ export class NovelView extends TextFileView {
     }
 
     sceneAt(position: number): NovelScene | undefined {
-        return this.structure?.scenes.find(scene => scene.from < position && position < scene.to);
+        return this.structure?.scenes().find(scene => scene.from < position && position < scene.to);
     }
 
     sceneAtExact(state: EditorState, position: number): NovelScene | undefined {
-        return this.structure?.scenes.find(scene => scene.from == state.doc.lineAt(position).from);
+        return this.structure?.scenes().find(scene => scene.from == state.doc.lineAt(position).from);
     }
 }
 

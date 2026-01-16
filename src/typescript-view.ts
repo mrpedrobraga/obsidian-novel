@@ -5,7 +5,7 @@ import { EditorView, gutters, lineNumbers, scrollPastEnd } from "@codemirror/vie
 import { TextFileView, WorkspaceLeaf } from "obsidian";
 import { catppuccinLatte } from "@catppuccin/codemirror";
 import typescript from "typescript";
-import { NovelDocument, NovelScene, SceneItem } from "parser/novel-types";
+import { ActionLine, DialogueLine, NovelDocument, NovelScene, RichText, Speaker, TaggedAction } from "parser/novel-types";
 import { parseDocument } from "parser/novel-parser";
 import { Success } from "utils/success";
 
@@ -68,6 +68,16 @@ export class TypescriptView extends TextFileView {
             toItems(scene: NovelScene) {
                 return scene.items;
             },
+
+            is: (type: any): ((what: any) => boolean) => (what: any) => what instanceof type,
+
+            alphabetic: ((a: string, b: string) => a.localeCompare(b)),
+
+            Speaker,
+            DialogueLine,
+            TaggedAction,
+            ActionLine,
+            RichText,
         };
 
         const result = this.jsRunner(rawCodeJavascript, context);
@@ -102,6 +112,13 @@ Author: Pedro Braga
 Once upon a time, a man got an umbrella.
 
 @BGM Rainy Day
+@BGM Reiny Day
+@BGM Rbiny Day
+@BGM Rciny Day
+@BGM Reiny Day
+@BGM Rziny Day
+@BGM kiny Day
+
 
 It was raining a lot.
 
@@ -135,7 +152,6 @@ function createEditor(view: TypescriptView, wrapper: HTMLDivElement): EditorView
     });
 
     editor.contentDOM.classList.add("code-editor");
-    editor.contentDOM.setAttribute("spellcheck", "true");
     return editor;
 }
 

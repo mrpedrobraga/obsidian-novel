@@ -1,4 +1,4 @@
-import { RenderText } from "./novel-visualise";
+import { Render } from "./novel-visualise";
 
 export type PropertyKey = string;
 export type PropertyValue = string;
@@ -16,7 +16,7 @@ export class DocumentTextRange {
 /** Text that has stuff inside of it... */
 
 /** A reference to a concept. */
-export class Reference extends DocumentTextRange implements RenderText {
+export class Reference extends DocumentTextRange implements Render {
     constructor(range: DocumentTextRange, public referent: string, public alias?: string) {
         super(range.from, range.to);
     }
@@ -32,7 +32,7 @@ export type RichTextPart =
     | { t: "formatting"; f: string; c: RichText }
     | { t: "reference"; c: Reference };
 
-export class RichText implements RenderText {
+export class RichText implements Render {
     constructor(public parts: RichTextPart[]) { }
 
     static simpleFromString(text: string): RichText {
@@ -67,8 +67,8 @@ export class NovelDocument {
         return this._scenes;
     }
 
-    items(): SceneItem[][] {
-        return this._scenes.map(scene => scene.items);
+    items(): SceneItem[] {
+        return this._scenes.flatMap(scene => scene.items);
     }
 }
 
@@ -85,7 +85,7 @@ export class NovelScene extends DocumentTextRange {
 export type SceneItem = ActionLine | Speaker | DialogueLine | TaggedAction;
 
 /** Plain action line. */
-export class ActionLine extends DocumentTextRange implements RenderText {
+export class ActionLine extends DocumentTextRange implements Render {
     constructor(range: DocumentTextRange, public content: RichText) {
         super(range.from, range.to);
     }
@@ -96,7 +96,7 @@ export class ActionLine extends DocumentTextRange implements RenderText {
 }
 
 /** Plain dialogue line. */
-export class DialogueLine extends DocumentTextRange implements RenderText {
+export class DialogueLine extends DocumentTextRange implements Render {
     constructor(range: DocumentTextRange, public content: RichText) {
         super(range.from, range.to);
     }
@@ -107,13 +107,13 @@ export class DialogueLine extends DocumentTextRange implements RenderText {
 }
 
 /** A tagged direction in the format "@TAG and then some text" */
-export class TaggedAction extends DocumentTextRange implements RenderText {
+export class TaggedAction extends DocumentTextRange implements Render {
     constructor(range: DocumentTextRange, public tag: string, public content: RichText) {
         super(range.from, range.to);
     }
 
     asText(): string {
-        return `@${this.tag} - ${this.content.asText()}`;
+        return `@${this.tag} - ${this.content.asText().trim()}`;
     }
 }
 
