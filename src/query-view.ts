@@ -1,4 +1,4 @@
-import { ActionLine, renderAsString, TaggedAction } from "parser/novel-types";
+import { ActionLine, SceneItem, TaggedAction } from "parser/novel-types";
 import { NovelView } from "novel-view";
 import { IconName, View } from "obsidian";
 
@@ -120,10 +120,10 @@ export class QueryView extends View {
             }
 
             const items = scene.items.filter(item => {
-                if (type && item.t === "taggedAction" && item.tag !== type) return false;
+                if (type && item.t === "taggedAction" && item.c.tag !== type) return false;
 
                 if (deduplicate && item.t === "taggedAction") {
-                    const key = renderAsString(item.content);
+                    const key = item.c.content.asText();
                     if (deduplicationSet.has(key)) return false;
                     deduplicationSet.add(key);
                 }
@@ -138,17 +138,8 @@ export class QueryView extends View {
             };
 
             for (const item of items) {
-                switch (item.t) {
-                    case "taggedAction":
-                        this.createTaggedActionEntryDOM(container, item, scroll);
-                        break;
-                    case "action":
-                        //this.createActionEntryDOM(container, item, scroll);
-                        break;
-                    case "speaker":
-                        break;
-                    case "dialogue":
-                        break;
+                if (item.t == "taggedAction") {
+                    QueryView.createItemDOM(item, container, scroll);
                 }
             }
 
@@ -158,17 +149,32 @@ export class QueryView extends View {
         }
     }
 
-    private createActionEntryDOM(container: HTMLElement, item: ActionLine, scroll: ScrollCallback) {
+    static createItemDOM(item: SceneItem, container: HTMLElement, scroll: (position: number) => (evt: Event) => void) {
+        switch (item.t) {
+            case "taggedAction":
+                QueryView.createTaggedActionEntryDOM(container, item.c, scroll);
+                break;
+            case "action":
+                //this.createActionEntryDOM(container, item, scroll);
+                break;
+            case "speaker":
+                break;
+            case "dialogue":
+                break;
+        }
+    }
+
+    static createActionEntryDOM(container: HTMLElement, item: ActionLine, scroll: ScrollCallback) {
         const element = container.createEl("a", { cls: "query-result-entry item", href: "#" });
-        element.createDiv({ cls: 'novel-action-line', text: renderAsString(item.content) });
+        element.createDiv({ cls: 'novel-action-line', text: item.content.asText() });
 
         element.addEventListener('mousedown', scroll(item.from));
     }
 
-    private createTaggedActionEntryDOM(container: HTMLElement, item: TaggedAction, scroll: ScrollCallback) {
+    static createTaggedActionEntryDOM(container: HTMLElement, item: TaggedAction, scroll: ScrollCallback) {
         const element = container.createEl("a", { cls: "query-result-entry item selected", href: "#" });
         element.createDiv({ cls: 'novel-tagged-action-tag', text: item.tag });
-        element.createDiv({ cls: 'novel-tagged-action-text', text: renderAsString(item.content) });
+        element.createDiv({ cls: 'novel-tagged-action-text', text: item.content.asText() });
         element.classList.add(`tag-${item.tag.trim().toLowerCase()}`);
 
         element.addEventListener('mousedown', scroll(item.from));

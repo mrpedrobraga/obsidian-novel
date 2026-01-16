@@ -1,9 +1,6 @@
 import { Text } from '@codemirror/state';
 import { ActionLine, DocumentTextRange, NovelDocument, NovelScene, PropertyKey, PropertyValue, RichText, TaggedAction } from 'parser/novel-types';
-
-type Success<T> = { success: true, value: T } | { success: false };
-function Success<T>(value: T): Success<T> { return { success: true, value } }
-function Failure(): Success<any> { return { success: false } }
+import { Success, Failure } from '../utils/success';
 
 export function parseDocument(source: Text): Success<NovelDocument> {
     const script: NovelDocument = {
@@ -114,6 +111,12 @@ export function parseScene(source: Text, position: number): Success<NovelScene> 
     while (currentPosition < source.length) {
         const line = source.lineAt(currentPosition);
 
+        if (line.text.trim() == "\n") {
+            advanceLine();
+            currentPosition += 1;
+            continue;
+        }
+
         // If the line is the start of a new scene, we stop.
         if (line.text[0] == "=") {
             currentPosition -= 1;
@@ -123,7 +126,7 @@ export function parseScene(source: Text, position: number): Success<NovelScene> 
         // Try parse tagged action.
         const parseTaggedActionResult = parseTaggedAction(source, currentPosition);
         if (parseTaggedActionResult.success) {
-            scene.items.push({ t: "taggedAction", ...parseTaggedActionResult.value })
+            scene.items.push({ t: "taggedAction", c: parseTaggedActionResult.value })
             currentPosition = parseTaggedActionResult.value.to + 1;
             continue;
         }
@@ -131,12 +134,8 @@ export function parseScene(source: Text, position: number): Success<NovelScene> 
         // Parse anything as an action for now.
         const richText = parseRichText(source, currentPosition, line.to);
         if (richText.success) {
-            const actionItem: ActionLine = {
-                content: richText.value,
-                from: line.from,
-                to: line.to
-            };
-            scene.items.push({ t: "action", ...actionItem });
+            const actionItem = new ActionLine({ from: line.from, to: line.to }, richText.value);
+            scene.items.push({ t: "action", c: actionItem });
         }
         advanceLine()
     }
@@ -146,30 +145,21 @@ export function parseScene(source: Text, position: number): Success<NovelScene> 
     return Success(scene);
 }
 
-export function parseTaggedAction(source: Text, position: number): Success<TaggedAction> {
+export function parseTaggedAction(source: Text, from: number): Success<TaggedAction> {
     const TAGGED_ACTION_REGEX = /^@(\w+) (.+?)$/;
-    const line = source.lineAt(position);
+    const line = source.lineAt(from);
     const match = TAGGED_ACTION_REGEX.exec(line.text);
     if (!match) return Failure();
 
-    const textStart = position + 1 + match[1]!.length;
-    const end = position + match[0].length;
-    const richText = parseRichText(source, textStart, end);
+    const textStart = from + 1 + match[1]!.length;
+    const to = from + match[0].length;
+    const richText = parseRichText(source, textStart, to);
 
     if (!richText.success) return Failure();
 
-    return Success({
-        tag: match[1]!,
-        content: richText.value,
-        from: position,
-        to: end
-    })
+    return Success(new TaggedAction({ from, to }, match[1]!, richText.value));
 }
 
 export function parseRichText(source: Text, from: number, to: number): Success<RichText> {
-    return Success(dummyRichText(source.slice(from, to).toString()))
-}
-
-function dummyRichText(text: string): RichText {
-    return { parts: [{ t: "text", c: text }] }
+    return Success(RichText.simpleFromString(source.slice(from, to).toString()))
 }

@@ -48,7 +48,7 @@ export class DummyView extends TextFileView {
                     EditorView.updateListener.of(update => {
                         if (update.docChanged) {
                             this.data = this.editor.state.doc.toString();
-                            this.requestSave()
+                            this.requestSave();
                         };
                     }),
                 ]

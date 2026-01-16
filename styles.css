@@ -7,6 +7,49 @@ If your plugin does not need CSS, delete this file.
 
 */
 
+.ts-view {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.ts-wrapper {
+    display: flex;
+    flex-direction: row !important;
+    width: 100%;
+    justify-content: center;
+    gap: var(--size-4-1);
+}
+
+.ts-view .cm-content {
+    font-family: 'JetBrainsMono', monospace;
+}
+
+.code-editor .cm-scroller {
+    overflow: hidden;
+}
+
+.ts-view .cm-editor {
+    min-width: 500px;
+    min-height: 100px !important;
+    height: 250px;
+    flex-grow: 0 !important;
+}
+
+.ts-view .repl-preview {
+    width: 500px;
+    height: fit-content;
+    max-height: 100%;
+    padding: var(--size-4-1);
+    overflow-x: scroll;
+    overflow-y: scroll;
+    font-family: 'JetBrainsMono', monospace;
+    color: var(--text-faint);
+    white-space: pre;
+}
+
+/** NOVEL **/
+
 .novel-wrapper {
     display: flex;
     flex-direction: column;
@@ -65,23 +108,24 @@ If your plugin does not need CSS, delete this file.
 }
 
 .novel-view .novel-scene-header::before {
-    content: "🎬";
+    content: "📖";
     margin-inline-end: var(--size-4-2);
 }
 
 .novel-view .novel-scene-header.scene-tagged-complete {
-    color: var(--color-green);
+    color: var(--color-red);
 
     &::before {
-        content: "✓";
+        content: "📕";
     }
 }
 
 .novel-view .novel-scene-header.scene-tagged-boss {
     color: var(--color-yellow);
 
-    &::before {
-        content: "👑";
+    &::after {
+        content: "⚔️";
+        margin-inline-start: var(--size-4-2);
     }
 }
 
@@ -431,7 +475,7 @@ If your plugin does not need CSS, delete this file.
     font-size: var(--font-small);
 
     &::before {
-        content: "🎬 " counter(entry-no) ". ";
+        content: "📖 " counter(entry-no) ". ";
         white-space: pre-line;
     }
 }
@@ -443,24 +487,23 @@ If your plugin does not need CSS, delete this file.
     text-overflow: ellipsis;
     white-space: nowrap;
     vertical-align: middle;
-    display: none;
 }
 
 .query-result-entry.scene.scene-tagged-complete .title {
     &::before {
-        content: "✓ " counter(entry-no) ". ";
+        content: "📕 " counter(entry-no) ". ";
     }
 
     color: color-mix(in srgb,
-        var(--color-green) 80%,
+        var(--color-red) 80%,
         var(--text-normal));
     ;
     font-weight: bold;
 }
 
 .query-result-entry.scene.scene-tagged-boss .title {
-    &::before {
-        content: "👑 " counter(entry-no) ". ";
+    &::after {
+        content: " ⚔️";
     }
 
     color: color-mix(in srgb,
