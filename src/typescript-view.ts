@@ -68,17 +68,30 @@ export class TypescriptView extends TextFileView {
             toItems(scene: NovelScene) {
                 return scene.items;
             },
-
         };
 
         const result = this.jsRunner(rawCodeJavascript, context);
 
         if (result.success) {
-            this.updatePreview(result.value);
+            const resultValue = result.value;
+
+            this.updatePreview(tryAsText(resultValue));
         } else {
             //console.error(result.value);
         }
     }
+}
+
+function tryAsText(what: any): any {
+    if (typeof what.asText === "function") {
+        return what.asText();
+    }
+
+    if (Array.isArray(what)) {
+        return what.map(tryAsText);
+    }
+
+    return what;
 }
 
 const EXAMPLE_NOV = `

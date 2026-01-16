@@ -3,10 +3,7 @@ import { ActionLine, DocumentTextRange, NovelDocument, NovelScene, PropertyKey, 
 import { Success, Failure } from '../utils/success';
 
 export function parseDocument(source: Text): Success<NovelDocument> {
-    const script: NovelDocument = {
-        metadata: {},
-        scenes: []
-    };
+    const script = new NovelDocument({}, []);
 
     let currentPosition = 0;
 
@@ -44,7 +41,7 @@ export function parseDocument(source: Text): Success<NovelDocument> {
 
         if (parseSceneResult.success) {
             const scene = parseSceneResult.value;
-            script.scenes.push(scene);
+            script.pushScene(scene);
             currentPosition = scene.to + 1;
         } else {
             source.lineAt(currentPosition).to
@@ -111,7 +108,7 @@ export function parseScene(source: Text, position: number): Success<NovelScene> 
     while (currentPosition < source.length) {
         const line = source.lineAt(currentPosition);
 
-        if (line.text.trim() == "\n") {
+        if (line.text.trim() == "\n" || line.text.trim() == "") {
             advanceLine();
             currentPosition += 1;
             continue;
@@ -126,7 +123,7 @@ export function parseScene(source: Text, position: number): Success<NovelScene> 
         // Try parse tagged action.
         const parseTaggedActionResult = parseTaggedAction(source, currentPosition);
         if (parseTaggedActionResult.success) {
-            scene.items.push({ t: "taggedAction", c: parseTaggedActionResult.value })
+            scene.items.push(parseTaggedActionResult.value)
             currentPosition = parseTaggedActionResult.value.to + 1;
             continue;
         }
@@ -135,7 +132,7 @@ export function parseScene(source: Text, position: number): Success<NovelScene> 
         const richText = parseRichText(source, currentPosition, line.to);
         if (richText.success) {
             const actionItem = new ActionLine({ from: line.from, to: line.to }, richText.value);
-            scene.items.push({ t: "action", c: actionItem });
+            scene.items.push(actionItem);
         }
         advanceLine()
     }

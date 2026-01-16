@@ -57,8 +57,19 @@ export class RichText implements RenderText {
 
 /** The novel document, which contains scenes. */
 export class NovelDocument {
-    metadata: Metadata;
-    scenes: NovelScene[];
+    constructor(public metadata: Metadata, private _scenes: NovelScene[]) { }
+
+    pushScene(scene: NovelScene) {
+        this._scenes.push(scene);
+    }
+
+    scenes(): NovelScene[] {
+        return this._scenes;
+    }
+
+    items(): SceneItem[][] {
+        return this._scenes.map(scene => scene.items);
+    }
 }
 
 /** A novel scene, which contains dialogue, directions and more. */
@@ -71,11 +82,7 @@ export class NovelScene extends DocumentTextRange {
 
 /* ----- Scene Items ----- */
 
-export type SceneItem =
-    | ({ t: "action", c: ActionLine })
-    | ({ t: "speaker", c: Speaker })
-    | ({ t: "dialogue", c: DialogueLine })
-    | ({ t: "taggedAction", c: TaggedAction });
+export type SceneItem = ActionLine | Speaker | DialogueLine | TaggedAction;
 
 /** Plain action line. */
 export class ActionLine extends DocumentTextRange implements RenderText {

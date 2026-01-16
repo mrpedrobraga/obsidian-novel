@@ -120,10 +120,10 @@ export class QueryView extends View {
             }
 
             const items = scene.items.filter(item => {
-                if (type && item.t === "taggedAction" && item.c.tag !== type) return false;
+                if (type && item instanceof TaggedAction && item.tag !== type) return false;
 
-                if (deduplicate && item.t === "taggedAction") {
-                    const key = item.c.content.asText();
+                if (deduplicate && item instanceof TaggedAction) {
+                    const key = item.content.asText();
                     if (deduplicationSet.has(key)) return false;
                     deduplicationSet.add(key);
                 }
@@ -138,7 +138,7 @@ export class QueryView extends View {
             };
 
             for (const item of items) {
-                if (item.t == "taggedAction") {
+                if (item instanceof TaggedAction) {
                     QueryView.createItemDOM(item, container, scroll);
                 }
             }
@@ -149,19 +149,10 @@ export class QueryView extends View {
         }
     }
 
+    /** TODO: Move these to a new interface `RenderDOM`. */
     static createItemDOM(item: SceneItem, container: HTMLElement, scroll: (position: number) => (evt: Event) => void) {
-        switch (item.t) {
-            case "taggedAction":
-                QueryView.createTaggedActionEntryDOM(container, item.c, scroll);
-                break;
-            case "action":
-                //this.createActionEntryDOM(container, item, scroll);
-                break;
-            case "speaker":
-                break;
-            case "dialogue":
-                break;
-        }
+        if (item instanceof TaggedAction)
+            return QueryView.createActionEntryDOM(container, item, scroll)
     }
 
     static createActionEntryDOM(container: HTMLElement, item: ActionLine, scroll: ScrollCallback) {
