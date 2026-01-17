@@ -1,5 +1,5 @@
 import { Text } from '@codemirror/state';
-import { ActionLine, DocumentTextRange, NovelDocument, NovelScene, PropertyKey, PropertyValue, RichText, TaggedAction } from 'parser/novel-types';
+import { ActionLine, DocumentTextRange, NovelDocument, NovelScene, PropertyKey, PropertyValue, RichText, SceneItem, Speaker, TaggedAction } from 'parser/novel-types';
 import { Success, Failure } from '../utils/success';
 
 export function parseDocument(source: Text): Success<NovelDocument> {
@@ -74,13 +74,8 @@ export function parseScene(source: Text, position: number): Success<NovelScene> 
 
     const name = match[2] ?? "Unnamed Scene";
 
-    let scene: NovelScene = {
-        name,
-        metadata: {},
-        items: [],
-        from: line.from,
-        to: 0
-    };
+    const metadata: Record<PropertyKey, PropertyValue> = {};
+    const items: SceneItem[] = [];
 
     let currentPosition = position + match[0].length + 1;
     function advanceLine() {
@@ -98,7 +93,7 @@ export function parseScene(source: Text, position: number): Success<NovelScene> 
 
         let property = parseProperty(source, currentPosition);
         if (property.success) {
-            scene.metadata[property.value[0]] = property.value[1]
+            metadata[property.value[0]] = property.value[1]
             currentPosition = property.value[2].to + 1;
         } else {
             break;
@@ -120,26 +115,32 @@ export function parseScene(source: Text, position: number): Success<NovelScene> 
             break;
         };
 
-        // Try parse tagged action.
-        const parseTaggedActionResult = parseTaggedAction(source, currentPosition);
-        if (parseTaggedActionResult.success) {
-            scene.items.push(parseTaggedActionResult.value)
-            currentPosition = parseTaggedActionResult.value.to + 1;
-            continue;
+        currentPosition = line.from;
+
+        function attempt(parser: (source: Text, from: number, to: number) => Success<SceneItem>): boolean {
+            const result = parser(source, currentPosition, line.to);
+            if (result.success) {
+                items.push(result.value);
+                currentPosition = result.value.to + 1;
+                return true;
+            } else {
+                return false;
+            }
         }
+
+        if (attempt(parseTaggedAction)) continue;
+        if (attempt(parseComment)) continue;
 
         // Parse anything as an action for now.
         const richText = parseRichText(source, currentPosition, line.to);
         if (richText.success) {
             const actionItem = new ActionLine({ from: line.from, to: line.to }, richText.value);
-            scene.items.push(actionItem);
+            items.push(actionItem);
         }
         advanceLine()
     }
 
-    scene.to = currentPosition;
-
-    return Success(scene);
+    return Success(new NovelScene(line.from, currentPosition, name, metadata, items));
 }
 
 export function parseTaggedAction(source: Text, from: number): Success<TaggedAction> {
@@ -155,6 +156,26 @@ export function parseTaggedAction(source: Text, from: number): Success<TaggedAct
     if (!richText.success) return Failure();
 
     return Success(new TaggedAction({ from, to }, match[1]!, richText.value));
+}
+
+export function parseSpeaker(source: Text, from: number, to: number): Success<Speaker> {
+    const text = source.slice(from, to).toString();
+    const regex = /^\[\s*([^\[\]|]+?)\s*(?:\|\s*([^\[\]]+?)\s*)?\]$/;
+    const match = regex.exec(text);
+    if (match) {
+        return Success(new Speaker({ from, to }, match[1]!, match[2]))
+    } else {
+        return Failure()
+    }
+}
+
+export function parseComment(source: Text, from: number, to: number): Success<ActionLine> {
+    const text = source.slice(from, to).toString();
+    if (text.startsWith("//")) {
+        return Success(new ActionLine({ from, to }, RichText.simpleFromString(text.replace(/^\/\/\s*/, ""))))
+    } else {
+        return Failure()
+    }
 }
 
 export function parseRichText(source: Text, from: number, to: number): Success<RichText> {

@@ -7,47 +7,6 @@ If your plugin does not need CSS, delete this file.
 
 */
 
-.ts-view {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-}
-
-.ts-wrapper {
-    display: flex;
-    flex-direction: row !important;
-    width: 100%;
-    justify-content: center;
-    gap: var(--size-4-1);
-}
-
-.ts-view .cm-content {
-    font-family: 'JetBrainsMono', monospace;
-}
-
-.code-editor .cm-scroller {
-    overflow: hidden;
-}
-
-.ts-view .cm-editor {
-    min-width: 500px;
-    min-height: 100px !important;
-    height: 250px;
-    flex-grow: 0 !important;
-}
-
-.ts-view .repl-preview {
-    width: 500px;
-    height: fit-content;
-    max-height: 100%;
-    padding: var(--size-4-1);
-    overflow-x: scroll;
-    overflow-y: scroll;
-    font-family: 'JetBrainsMono', monospace;
-    color: var(--text-faint);
-    white-space: pre;
-}
-
 /** NOVEL **/
 
 .novel-wrapper {
@@ -391,6 +350,31 @@ If your plugin does not need CSS, delete this file.
     border: 1px solid var(--background-modifier-border);
 }
 
+.query-view-container .cm-content {
+    font-family: 'JetBrainsMono', monospace;
+}
+
+.code-repl-editor .cm-scroller {
+    overflow: hidden;
+}
+
+.query-view-container .cm-editor {
+    min-height: 100px !important;
+    height: 100px;
+    flex-grow: 0 !important;
+}
+
+.query-view-container .repl-preview {
+    height: fit-content;
+    max-height: 100%;
+    padding: var(--size-4-1);
+    overflow-x: scroll;
+    overflow-y: scroll;
+    font-family: 'JetBrainsMono', monospace;
+    color: var(--text-faint);
+    white-space: pre;
+}
+
 .query-view-results {
     display: flex;
     flex-direction: column;
@@ -412,6 +396,7 @@ If your plugin does not need CSS, delete this file.
     border: 1px solid var(--background-modifier-border);
     border-radius: var(--radius-s);
     padding: var(--size-4-2);
+    width: 100%;
 
     display: flex;
     flex-direction: column;
@@ -433,21 +418,14 @@ If your plugin does not need CSS, delete this file.
     padding: var(--size-2-2);
     border: var(--border-width) solid var(--background-modifier-border);
     vertical-align: middle;
+    overflow: clip;
 
     counter-increment: entry-no;
 }
 
-.query-result-entry.scene {
-    flex-direction: column;
-}
-
-.query-result-entry.item {
-    font-family: var(--font-monospace-theme), 'Courier Prime';
-    gap: var(--size-4-1);
-
-    & .novel-tagged-action-tag {
-        font-weight: bolder;
-    }
+.query-result-group .query-result-entry:only-of-type {
+    border: none;
+    padding: 0;
 }
 
 .query-result-entry::before {
@@ -468,6 +446,28 @@ If your plugin does not need CSS, delete this file.
     & .summary {
         color: inherit;
     }
+}
+
+.query-result-entry.document {
+    flex-direction: column;
+}
+
+.query-result-entry.document .title {
+    font-weight: bold;
+    font-size: var(--font-small);
+}
+
+.query-result-entry.document .summary {
+    color: var(--text-faint);
+    font-size: var(--font-smallest);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    vertical-align: middle;
+}
+
+.query-result-entry.scene {
+    flex-direction: column;
 }
 
 .query-result-entry.scene .title {
@@ -511,4 +511,13 @@ If your plugin does not need CSS, delete this file.
         var(--text-normal));
     ;
     font-weight: bold;
+}
+
+.query-result-entry.item {
+    font-family: var(--font-monospace-theme), 'Courier Prime';
+    gap: var(--size-4-1);
+
+    & .novel-tagged-action-tag {
+        font-weight: bolder;
+    }
 }

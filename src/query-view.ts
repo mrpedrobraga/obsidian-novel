@@ -1,6 +1,8 @@
-import { ActionLine, SceneItem, TaggedAction } from "parser/novel-types";
+import { ActionLine, DialogueLine, NovelScene, RichText, Speaker, TaggedAction } from "parser/novel-types";
 import { NovelView } from "novel-view";
-import { IconName, View } from "obsidian";
+import { debounce, Debouncer, IconName, View, WorkspaceLeaf } from "obsidian";
+import { createREPLEditor, runTS, mapAsText, mapAsDOM, Tree } from "./repl";
+import { EditorView } from "@codemirror/basic-setup";
 
 export const QUERY_VIEW_TYPE = "novel-query-view";
 
@@ -8,6 +10,9 @@ export class QueryView extends View {
     selectedQuerySource = "Scenes";
     resultsContainer: HTMLDivElement;
     currentView: NovelView | null;
+    replEditor: EditorView;
+
+    updateDebounced: Debouncer<[], void>;
 
     getViewType(): string {
         return QUERY_VIEW_TYPE;
@@ -21,49 +26,50 @@ export class QueryView extends View {
         return "search"
     }
 
+    constructor(leaf: WorkspaceLeaf) {
+        super(leaf);
+        this.updateDebounced = debounce(this.update, 500);
+    }
+
     protected async onOpen() {
         const containerEl = this.containerEl;
         containerEl.empty();
-
-        const searchContainer = containerEl.createDiv({ cls: "query-view-search" });
-        const input = searchContainer.createEl("input", {
-            type: "text",
-            placeholder: "Enter your query...",
-        });
-
-        const typeContainer = containerEl.createEl('select', { cls: 'query-view-type-filter' });
-        typeContainer.createEl('option', { text: "Scenes" });
-        typeContainer.createEl('option', { text: "BGM" });
-        typeContainer.createEl('option', { text: "VS" });
-        typeContainer.createEl('option', { text: "TRANS" });
-        typeContainer.createEl('option', { text: "SAVE" });
-        typeContainer.createEl('option', { text: "SFX" });
-        typeContainer.createEl('option', { text: "CHYRON" });
-        typeContainer.addEventListener('change', (e) => {
-            this.selectedQuerySource = (e.target as HTMLSelectElement).value;
-            this.updateResults();
-        })
-
-        this.resultsContainer = containerEl.createDiv({ cls: "query-view-results" });
-        this.resultsContainer.setText("Results will appear here.");
-
         containerEl.addClass("query-view-container");
 
+        const searchContainer = containerEl.createDiv({ cls: "query-view-search" });
+        this.replEditor = createREPLEditor(this, searchContainer);
+
+        // const typeContainer = containerEl.createEl('select', { cls: 'query-view-type-filter' });
+        // typeContainer.createEl('option', { text: "Scenes" });
+        // typeContainer.createEl('option', { text: "BGM" });
+        // typeContainer.createEl('option', { text: "VS" });
+        // typeContainer.createEl('option', { text: "TRANS" });
+        // typeContainer.createEl('option', { text: "SAVE" });
+        // typeContainer.createEl('option', { text: "SFX" });
+        // typeContainer.createEl('option', { text: "CHYRON" });
+        // typeContainer.addEventListener('change', (e) => {
+        //     this.selectedQuerySource = (e.target as HTMLSelectElement).value;
+        //     this.updateResults();
+        // })
+
+        this.resultsContainer = containerEl.createDiv({ cls: "query-view-results" });
+        this.resultsContainer.setText("Type a query...");
+
         this.registerEvent(
-            this.app.workspace.on("active-leaf-change", () => this.updateResults())
+            this.app.workspace.on("active-leaf-change", () => this.update())
         );
         this.registerEvent(
             this.app.vault.on('modify', (file) => {
                 if (this.currentView) {
                     if (file.path == this.currentView.file?.path) {
-                        this.updateResults()
+                        this.updateDebounced()
                     }
                 }
             })
         )
     }
 
-    async updateResults() {
+    async update() {
         const leaf = this.app.workspace.getMostRecentLeaf();
         const view = leaf?.view;
 
@@ -71,11 +77,45 @@ export class QueryView extends View {
             this.currentView = view;
             this.resultsContainer.empty();
 
-            if (this.selectedQuerySource == "Scenes") {
-                this.updateWithHeadings(view);
-            } else {
+            const currentQuery = this.replEditor.state.doc.toString();
 
-                this.updateWithItems(view, this.selectedQuerySource);
+            const doc = view.getDocument();
+            if (!doc) {
+                this.currentView = null;
+                this.resultsContainer.empty();
+                this.resultsContainer.setText("No document for the open view.");
+            }
+
+            const cx = {
+                doc,
+                toItems(scene: NovelScene) {
+                    return scene.items;
+                },
+
+                is: (type: any): ((what: any) => boolean) => (what: any) => what instanceof type,
+
+                alphabetically: ((a: string, b: string) => a.localeCompare(b)),
+
+                Speaker,
+                DialogueLine,
+                TaggedAction,
+                ActionLine,
+                RichText,
+            };
+            const result = runTS(currentQuery, cx);
+
+            let scrollCallback = (position: number) => (evt: Event) => {
+                evt.preventDefault();
+                evt.stopPropagation();
+                view.scrollTo(position);
+            };
+
+            if (result.success) {
+                const resultValue = result.value;
+                mapAsDOM(resultValue, { scrollCallback, container: this.resultsContainer });
+            } else {
+                this.resultsContainer.empty();
+                this.resultsContainer.innerText = result.value.toString();
             }
         } else {
             this.currentView = null;
@@ -83,93 +123,5 @@ export class QueryView extends View {
             this.resultsContainer.setText("No information for the open view.");
         }
     }
-
-    private updateWithHeadings(view: NovelView) {
-        let scenes = view.getScenes();
-        for (const scene of scenes) {
-            const element = this.resultsContainer.createEl("a", { cls: "query-result-entry scene", href: "#" });
-            element.createDiv({ cls: 'title', text: `${scene.name}` });
-            element.createDiv({ cls: 'summary', text: scene.metadata["Summary"] ?? 'No summary.' });
-
-            for (const tag of scene.metadata["Tags"]?.split(/,\s*/) ?? []) {
-                element.classList.add(`scene-tagged-${tag.trim().toLowerCase()}`);
-            }
-
-            element.addEventListener('mousedown', (evt) => {
-                evt.preventDefault();
-                evt.stopPropagation();
-                view.scrollTo(scene.from);
-            });
-        }
-    }
-
-    private updateWithItems(view: NovelView, type: string | null) {
-        const grouped = true;
-
-        const deduplicate = false;
-        const deduplicationSet = new Set();
-
-        let container: HTMLElement;
-
-        for (const scene of view.getScenes()) {
-            if (grouped) {
-                container = this.resultsContainer.createEl('fieldset', { cls: 'query-result-group' });
-                container.createEl('legend', { text: scene.name });
-            } else {
-                container = this.resultsContainer;
-            }
-
-            const items = scene.items.filter(item => {
-                if (type && item instanceof TaggedAction && item.tag !== type) return false;
-
-                if (deduplicate && item instanceof TaggedAction) {
-                    const key = item.content.asText();
-                    if (deduplicationSet.has(key)) return false;
-                    deduplicationSet.add(key);
-                }
-
-                return true;
-            });
-
-            let scroll = (position: number) => (evt: Event) => {
-                evt.preventDefault();
-                evt.stopPropagation();
-                view.scrollTo(position);
-            };
-
-            for (const item of items) {
-                if (item instanceof TaggedAction) {
-                    QueryView.createItemDOM(item, container, scroll);
-                }
-            }
-
-            if (grouped && container.childElementCount == 1) {
-                this.resultsContainer.removeChild(container);
-            }
-        }
-    }
-
-    /** TODO: Move these to a new interface `RenderDOM`. */
-    static createItemDOM(item: SceneItem, container: HTMLElement, scroll: (position: number) => (evt: Event) => void) {
-        if (item instanceof TaggedAction)
-            return QueryView.createActionEntryDOM(container, item, scroll)
-    }
-
-    static createActionEntryDOM(container: HTMLElement, item: ActionLine, scroll: ScrollCallback) {
-        const element = container.createEl("a", { cls: "query-result-entry item", href: "#" });
-        element.createDiv({ cls: 'novel-action-line', text: item.content.asText() });
-
-        element.addEventListener('mousedown', scroll(item.from));
-    }
-
-    static createTaggedActionEntryDOM(container: HTMLElement, item: TaggedAction, scroll: ScrollCallback) {
-        const element = container.createEl("a", { cls: "query-result-entry item selected", href: "#" });
-        element.createDiv({ cls: 'novel-tagged-action-tag', text: item.tag });
-        element.createDiv({ cls: 'novel-tagged-action-text', text: item.content.asText() });
-        element.classList.add(`tag-${item.tag.trim().toLowerCase()}`);
-
-        element.addEventListener('mousedown', scroll(item.from));
-    }
 }
 
-type ScrollCallback = (position: number) => (event: Event) => void;

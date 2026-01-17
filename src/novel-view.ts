@@ -22,7 +22,7 @@ export class NovelView extends TextFileView {
     editor: EditorView | null = null;
     playback: HTMLDivElement;
     audio: HTMLAudioElement;
-    structure: NovelDocument | null = null;
+    document: NovelDocument | null = null;
     requestUpdate: Debouncer<[], void>;
 
     constructor(leaf: WorkspaceLeaf) {
@@ -94,7 +94,7 @@ export class NovelView extends TextFileView {
         try {
             const parseResult = parseDocument(this.editor.state.doc);
             if (parseResult.success) {
-                this.structure = parseResult.value;
+                this.document = parseResult.value;
                 // console.log(parseResult.value, null, " ");
             }
         } catch (e) {
@@ -156,13 +156,17 @@ export class NovelView extends TextFileView {
         }
     }
 
+    getDocument(): NovelDocument | null {
+        return this.document;
+    }
+
     getMetadata(): Metadata {
-        return this.structure?.metadata ?? {};
+        return this.document?.metadata ?? {};
     }
 
     getScenes(): NovelScene[] {
-        if (!this.structure) return [];
-        return this.structure.scenes();
+        if (!this.document) return [];
+        return this.document.scenes();
     }
 
     sceneRangeAt(position: number): DocumentTextRange | null {
@@ -172,11 +176,11 @@ export class NovelView extends TextFileView {
     }
 
     sceneAt(position: number): NovelScene | undefined {
-        return this.structure?.scenes().find(scene => scene.from < position && position < scene.to);
+        return this.document?.scenes().find(scene => scene.from < position && position < scene.to);
     }
 
     sceneAtExact(state: EditorState, position: number): NovelScene | undefined {
-        return this.structure?.scenes().find(scene => scene.from == state.doc.lineAt(position).from);
+        return this.document?.scenes().find(scene => scene.from == state.doc.lineAt(position).from);
     }
 }
 

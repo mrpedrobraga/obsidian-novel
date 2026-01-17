@@ -1,13 +1,8 @@
-import { FileView, Notice, Plugin } from 'obsidian';
+import { FileView, Plugin } from 'obsidian';
 import { DEFAULT_SETTINGS, NovelSettings, SampleSettingTab as NovelSettingTab } from "./settings";
-import { Decoration, DecorationSet, EditorView, PluginValue, ViewPlugin, ViewUpdate, WidgetType } from '@codemirror/view';
-import { RangeSetBuilder } from '@codemirror/state';
-import { join } from 'path';
 import { NOVEL_VIEW_TYPE, NovelView } from 'novel-view';
 import { DummyView, TXT_VIEW_TYPE } from 'dummy-txt-view';
 import { QUERY_VIEW_TYPE, QueryView } from 'query-view';
-import { TYPESCRIPT_VIEW, TypescriptView } from 'typescript-view';
-import { Failure, FailureWith, Success } from 'utils/success';
 
 // Remember to rename these classes and interfaces!
 
@@ -19,7 +14,6 @@ export default class NovelPlugin extends Plugin {
         this.addSettingTab(new NovelSettingTab(this.app, this));
 
         this.registerTxtView();
-        this.registerTsView();
         this.registerNovelView();
         this.registerQueryView();
     }
@@ -28,36 +22,6 @@ export default class NovelPlugin extends Plugin {
         this.registerView(TXT_VIEW_TYPE, (leaf) => new DummyView(leaf));
         this.registerHoverLinkSource(TXT_VIEW_TYPE, { display: "Plain Text", defaultMod: true });
         this.registerExtensions(["txt"], TXT_VIEW_TYPE);
-    }
-
-    private registerTsView() {
-        this.registerView(TYPESCRIPT_VIEW, (leaf) => new TypescriptView(leaf, this.runJS));
-        this.registerExtensions(["ts"], TYPESCRIPT_VIEW);
-
-        this.addCommand({
-            id: "open-ts-repl",
-            name: "Open TS Repl",
-            callback: async () => {
-                const l = this.app.workspace.getLeaf();
-                await l.setViewState({
-                    type: TYPESCRIPT_VIEW,
-                    active: true
-                });
-                this.app.workspace.revealLeaf(l);
-            }
-        });
-    }
-
-    runJS(javascript: string, context: any): Success<any, any> {
-        const vm = require("node:vm");
-        const vmContext = vm.createContext(context);
-
-        try {
-            const result = vm.runInContext(javascript, vmContext);
-            return Success(result);
-        } catch (e) {
-            return FailureWith(e)
-        }
     }
 
     private registerNovelView() {

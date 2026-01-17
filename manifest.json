@@ -6,5 +6,5 @@
     "description": "Allows editing and visualising scripts written in the `novel` markup language.",
     "author": "Pedro Braga",
     "authorUrl": "https://mrpedrobraga.com",
-    "isDesktopOnly": false
+    "isDesktopOnly": true
 }
