@@ -149,7 +149,7 @@ export function parseTaggedAction(source: Text, from: number): Success<TaggedAct
     const match = TAGGED_ACTION_REGEX.exec(line.text);
     if (!match) return Failure();
 
-    const textStart = from + 1 + match[1]!.length;
+    const textStart = from + 1 + match[1]!.length + 1;
     const to = from + match[0].length;
     const richText = parseRichText(source, textStart, to);
 

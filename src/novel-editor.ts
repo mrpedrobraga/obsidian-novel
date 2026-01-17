@@ -10,7 +10,7 @@ import {
     keymap,
     ViewPlugin,
 } from "@codemirror/view";
-import { RangeSetBuilder, EditorState, StateField, Transaction, Extension } from "@codemirror/state";
+import { RangeSetBuilder, EditorState, StateField, Transaction, Extension, Line } from "@codemirror/state";
 import { DocumentTextRange } from "parser/novel-types";
 import { NovelView } from "novel-view";
 import { highlightSelectionMatches, search, searchKeymap } from "@codemirror/search";
@@ -244,96 +244,101 @@ function buildDecorations(view: NovelView, state: EditorState, visibleRanges: Do
 
             // Dialogue / Action fallback
 
-            const lineDeco: { from: number, to: number, value: Decoration }[] = [];
-
-            // Wikilinks
-            const WIKILINK_REGEX = /\[\[([^\]]+?)(?:\|([^\]]+?))?\]\]/g;
-            for (const match of line.text.matchAll(WIKILINK_REGEX)) {
-                const start = line.from + match.index!;
-                const end = start + match[0].length;
-
-                if (lineHasCursor) {
-                    lineDeco.push({ from: start, to: end, value: Decoration.mark({ class: 'novel-wikilink' }) })
-                } else {
-                    lineDeco.push({
-                        from: start, to: end, value: Decoration.replace({
-                            widget: new ReferenceWidget(view.app, view.file?.path ?? "/", match as RegExpExecArray, match[1] ?? '[Broken Reference]', match[2])
-                        })
-                    });
-                }
-            }
-
-            // Links
-            const LINK_REGEX = /\[([^\]]+?)\](?:\(([^\)]+?)\))/g;
-            for (const match of line.text.matchAll(LINK_REGEX)) {
-                const start = line.from + match.index!;
-                const end = start + match[0].length;
-
-                if (lineHasCursor) {
-                    lineDeco.push({ from: start, to: end, value: Decoration.mark({ class: 'novel-wikilink' }) })
-                } else {
-                    lineDeco.push({
-                        from: start, to: end, value: Decoration.replace({
-                            widget: new LinkWidget(view.app, match as RegExpExecArray, match[2] ?? '#', match[1])
-                        })
-                    });
-                }
-            }
-
-            // Formatting
-            const BOLD_REGEX = /\*\*([^\*]+?)\*\*/g;
-            for (const match of line.text.matchAll(BOLD_REGEX)) {
-                const start = line.from + match.index!;
-                const end = start + match[0].length;
-
-                lineDeco.push({ from: start, to: end, value: Decoration.mark({ class: 'bold' }) });
-                lineDeco.push({ from: start, to: start + 2, value: Decoration.mark({ class: 'hide' }) });
-                lineDeco.push({ from: start + match[1]!.length + 2, to: start + match[1]!.length + 4, value: Decoration.mark({ class: 'hide' }) });
-            }
-
-            const ITALIC_REGEX = /(?<!\*)\*([^\*]+?)\*/g;
-            for (const match of line.text.matchAll(ITALIC_REGEX)) {
-                const start = line.from + match.index!;
-                const end = start + match[0].length;
-
-                lineDeco.push({ from: start, to: end, value: Decoration.mark({ class: 'italic' }) });
-                lineDeco.push({ from: start, to: start + 1, value: Decoration.mark({ class: 'hide' }) });
-                lineDeco.push({ from: start + match[1]!.length + 1, to: start + match[1]!.length + 2, value: Decoration.mark({ class: 'hide' }) });
-            }
-
-            if (inDialogue) {
-                const isParentheticalClass = /^\s*\(.*?\)\s*/.test(line.text) ? 'parenthetical' : '';
-
-                lineDeco.push({
-                    from: line.from,
-                    to: line.to,
-                    value: Decoration.mark({
-                        class: `novel-dialogue ${isParentheticalClass} ${isSelectedClass}`
-                    })
-                })
-            } else {
-                lineDeco.push({
-                    from: line.from,
-                    to: line.to,
-                    value: Decoration.mark({ class: `novel-action-line ${isSelectedClass}` })
-                })
-            }
-
-            lineDeco.sort((a, b) => {
-                if (a.from == b.from) {
-                    return 0;
-                } else {
-                    return a.from - b.from;
-                }
-            });
-            lineDeco
-                .forEach(deco => builder.add(deco.from, deco.to, deco.value));
-
-            pos = line.to + 1;
+            pos = parseRichTextRange(line, lineHasCursor, inDialogue, isSelectedClass, pos);
         }
     }
 
     return builder.finish();
+
+    function parseRichTextRange(line: Line, lineHasCursor: boolean, inDialogue: boolean, isSelectedClass: string, pos: number) {
+        const lineDeco: { from: number; to: number; value: Decoration; }[] = [];
+
+        // Wikilinks
+        const WIKILINK_REGEX = /\[\[([^\]]+?)(?:\|([^\]]+?))?\]\]/g;
+        for (const match of line.text.matchAll(WIKILINK_REGEX)) {
+            const start = line.from + match.index!;
+            const end = start + match[0].length;
+
+            if (lineHasCursor) {
+                lineDeco.push({ from: start, to: end, value: Decoration.mark({ class: 'novel-wikilink' }) });
+            } else {
+                lineDeco.push({
+                    from: start, to: end, value: Decoration.replace({
+                        widget: new ReferenceWidget(view.app, view.file?.path ?? "/", match as RegExpExecArray, match[1] ?? '[Broken Reference]', match[2])
+                    })
+                });
+            }
+        }
+
+        // Links
+        const LINK_REGEX = /\[([^\]]+?)\](?:\(([^\)]+?)\))/g;
+        for (const match of line.text.matchAll(LINK_REGEX)) {
+            const start = line.from + match.index!;
+            const end = start + match[0].length;
+
+            if (lineHasCursor) {
+                lineDeco.push({ from: start, to: end, value: Decoration.mark({ class: 'novel-wikilink' }) });
+            } else {
+                lineDeco.push({
+                    from: start, to: end, value: Decoration.replace({
+                        widget: new LinkWidget(view.app, match as RegExpExecArray, match[2] ?? '#', match[1])
+                    })
+                });
+            }
+        }
+
+        // Formatting
+        const BOLD_REGEX = /\*\*([^\*]+?)\*\*/g;
+        for (const match of line.text.matchAll(BOLD_REGEX)) {
+            const start = line.from + match.index!;
+            const end = start + match[0].length;
+
+            lineDeco.push({ from: start, to: end, value: Decoration.mark({ class: 'bold' }) });
+            lineDeco.push({ from: start, to: start + 2, value: Decoration.mark({ class: 'hide' }) });
+            lineDeco.push({ from: start + match[1]!.length + 2, to: start + match[1]!.length + 4, value: Decoration.mark({ class: 'hide' }) });
+        }
+
+        const ITALIC_REGEX = /(?<!\*)\*([^\*]+?)\*/g;
+        for (const match of line.text.matchAll(ITALIC_REGEX)) {
+            const start = line.from + match.index!;
+            const end = start + match[0].length;
+
+            lineDeco.push({ from: start, to: end, value: Decoration.mark({ class: 'italic' }) });
+            lineDeco.push({ from: start, to: start + 1, value: Decoration.mark({ class: 'hide' }) });
+            lineDeco.push({ from: start + match[1]!.length + 1, to: start + match[1]!.length + 2, value: Decoration.mark({ class: 'hide' }) });
+        }
+
+        if (inDialogue) {
+            const isParentheticalClass = /^\s*\(.*?\)\s*/.test(line.text) ? 'parenthetical' : '';
+
+            lineDeco.push({
+                from: line.from,
+                to: line.to,
+                value: Decoration.mark({
+                    class: `novel-dialogue ${isParentheticalClass} ${isSelectedClass}`
+                })
+            });
+        } else {
+            lineDeco.push({
+                from: line.from,
+                to: line.to,
+                value: Decoration.mark({ class: `novel-action-line ${isSelectedClass}` })
+            });
+        }
+
+        lineDeco.sort((a, b) => {
+            if (a.from == b.from) {
+                return 0;
+            } else {
+                return a.from - b.from;
+            }
+        });
+        lineDeco
+            .forEach(deco => builder.add(deco.from, deco.to, deco.value));
+
+        pos = line.to + 1;
+        return pos;
+    }
 }
 
 export type SpeakerOptions = { contd: boolean };

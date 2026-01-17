@@ -139,7 +139,7 @@ export class NovelView extends TextFileView {
         view.dispatch({
             selection: { anchor: line.to },
             effects: [
-                EditorView.scrollIntoView(line.from, { y: "start" }),
+                EditorView.scrollIntoView(line.from, { y: "center" }),
             ]
         });
 

@@ -1,18 +1,15 @@
 import { ActionLine, DialogueLine, NovelScene, RichText, Speaker, TaggedAction } from "parser/novel-types";
 import { NovelView } from "novel-view";
 import { debounce, Debouncer, IconName, View, WorkspaceLeaf } from "obsidian";
-import { createREPLEditor, runTS, mapAsText, mapAsDOM, Tree } from "./repl";
+import { createREPLEditor, runTS, mapAsText, mapAsDOM, Tree, mapAsDOMIterative } from "./repl";
 import { EditorView } from "@codemirror/basic-setup";
 
 export const QUERY_VIEW_TYPE = "novel-query-view";
 
 export class QueryView extends View {
-    selectedQuerySource = "Scenes";
     resultsContainer: HTMLDivElement;
     currentView: NovelView | null;
     replEditor: EditorView;
-
-    updateDebounced: Debouncer<[], void>;
 
     getViewType(): string {
         return QUERY_VIEW_TYPE;
@@ -28,7 +25,6 @@ export class QueryView extends View {
 
     constructor(leaf: WorkspaceLeaf) {
         super(leaf);
-        this.updateDebounced = debounce(this.update, 500);
     }
 
     protected async onOpen() {
@@ -39,18 +35,28 @@ export class QueryView extends View {
         const searchContainer = containerEl.createDiv({ cls: "query-view-search" });
         this.replEditor = createREPLEditor(this, searchContainer);
 
-        // const typeContainer = containerEl.createEl('select', { cls: 'query-view-type-filter' });
-        // typeContainer.createEl('option', { text: "Scenes" });
-        // typeContainer.createEl('option', { text: "BGM" });
-        // typeContainer.createEl('option', { text: "VS" });
-        // typeContainer.createEl('option', { text: "TRANS" });
-        // typeContainer.createEl('option', { text: "SAVE" });
-        // typeContainer.createEl('option', { text: "SFX" });
-        // typeContainer.createEl('option', { text: "CHYRON" });
-        // typeContainer.addEventListener('change', (e) => {
-        //     this.selectedQuerySource = (e.target as HTMLSelectElement).value;
-        //     this.updateResults();
-        // })
+        const typeContainer = containerEl.createEl('select', { cls: 'query-view-type-filter' });
+        typeContainer.createEl('option', { text: "Scenes" });
+        typeContainer.createEl('option', { text: "BGM" });
+        typeContainer.createEl('option', { text: "VS" });
+        typeContainer.createEl('option', { text: "TRANS" });
+        typeContainer.createEl('option', { text: "SAVE" });
+        typeContainer.createEl('option', { text: "SFX" });
+        typeContainer.createEl('option', { text: "CHYRON" });
+        typeContainer.addEventListener('change', (e) => {
+            queueMicrotask(() => {
+                const target = e.target as HTMLSelectElement;
+                let query = "";
+
+                if (target.value === 'Scenes') {
+                    query = `doc.scenes()`;
+                } else {
+                    query = `doc.cues("${target.value}")`
+                }
+
+                this.replEditor.dispatch({ changes: { from: 0, to: this.replEditor.state.doc.length, insert: query } })
+            })
+        })
 
         this.resultsContainer = containerEl.createDiv({ cls: "query-view-results" });
         this.resultsContainer.setText("Type a query...");
@@ -62,7 +68,7 @@ export class QueryView extends View {
             this.app.vault.on('modify', (file) => {
                 if (this.currentView) {
                     if (file.path == this.currentView.file?.path) {
-                        this.updateDebounced()
+                        this.update()
                     }
                 }
             })
@@ -87,12 +93,15 @@ export class QueryView extends View {
             }
 
             const cx = {
+                fetch,
+
                 doc,
                 toItems(scene: NovelScene) {
                     return scene.items;
                 },
 
                 is: (type: any): ((what: any) => boolean) => (what: any) => what instanceof type,
+                content: (regex: RegExp) => (what: { content: RichText }) => what.content.asText().matchAll(regex),
 
                 alphabetically: ((a: string, b: string) => a.localeCompare(b)),
 
@@ -102,7 +111,7 @@ export class QueryView extends View {
                 ActionLine,
                 RichText,
             };
-            const result = runTS(currentQuery, cx);
+            const result = await runTS(currentQuery, cx);
 
             let scrollCallback = (position: number) => (evt: Event) => {
                 evt.preventDefault();
@@ -112,7 +121,13 @@ export class QueryView extends View {
 
             if (result.success) {
                 const resultValue = result.value;
-                mapAsDOM(resultValue, { scrollCallback, container: this.resultsContainer });
+                const start = performance.now();
+                const fragment = document.createDocumentFragment();
+                await mapAsDOM(resultValue, { scrollCallback, container: fragment });
+                this.resultsContainer.appendChild(fragment);
+                await new Promise(requestAnimationFrame);
+                console.log(currentQuery, performance.now() - start);
+
             } else {
                 this.resultsContainer.empty();
                 this.resultsContainer.innerText = result.value.toString();

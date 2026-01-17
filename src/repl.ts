@@ -7,6 +7,7 @@ import { closeBrackets } from "@codemirror/autocomplete";
 import { catppuccinLatte } from "@catppuccin/codemirror";
 import { javascript } from "@codemirror/lang-javascript";
 import { NovelComponentContext, Render } from "parser/novel-types";
+import vm from "node:vm";
 
 export const EXAMPLE_NOV = `
 Title: Example Script
@@ -59,14 +60,14 @@ export function createREPLEditor(view: QueryView, wrapper: HTMLElement): EditorV
 
 /** TYPESCRIPT COMPILE AND RUN **/
 
-export function runTS(typescript: string, context: any): Success<any, any> {
-    return runJS(transpileTStoJS(typescript), context)
+export async function runTS(typescript: string, context: any): Promise<Success<any, any>> {
+    return runJS(await transpileTStoJS(typescript), context)
 }
 
-export function transpileTStoJS(code: string): string {
+export async function transpileTStoJS(code: string): Promise<string> {
     const result = typescript.transpileModule(code, {
         compilerOptions: {
-            target: typescript.ScriptTarget.ES2020,
+            target: typescript.ScriptTarget.ESNext,
             module: typescript.ModuleKind.ESNext,
         }
     })
@@ -74,12 +75,12 @@ export function transpileTStoJS(code: string): string {
     return result.outputText
 }
 
-export function runJS(javascript: string, context: any): Success<any, any> {
-    const vm = require("node:vm");
-    const vmContext = vm.createContext(context);
+export async function runJS(javascript: string, _context: any): Promise<Success<any, any>> {
+    const context = vm.createContext(_context);
 
     try {
-        const result = vm.runInContext(javascript, vmContext);
+        const result = vm.runInContext(javascript, context);
+
         return Success(result);
     } catch (e) {
         return FailureWith(e)
@@ -101,6 +102,10 @@ export function mapAsText(what: Tree<any>): Tree<string> {
         return what.map(mapAsText);
     }
 
+    if (what instanceof Set) {
+        return [...what].map(mapAsText);
+    }
+
     return JSON.stringify(what, null, 2);
 }
 
@@ -114,14 +119,15 @@ export function intoString(what: any): string {
     return JSON.stringify(what, null, 2);
 }
 
-export function mapAsDOM(what: Tree<any>, cx: NovelComponentContext, level: number = 0): Tree<HTMLElement> {
-    if (what === null || what === undefined) return what;
+export async function mapAsDOM(node: Tree<any>, cx: NovelComponentContext, level: number = 0): Promise<void> {
+    if (node === null || node === undefined) return node;
 
-    if (typeof what.asDOM === "function") {
-        return (what as Render).asDOM(cx);
+    if (typeof node.pushDOM === "function") {
+        (node as Render).pushDOM(cx);
+        return;
     }
 
-    if (Array.isArray(what)) {
+    if (Array.isArray(node)) {
         let nestedContainer = cx.container;
 
         if (level > 0) {
@@ -129,31 +135,42 @@ export function mapAsDOM(what: Tree<any>, cx: NovelComponentContext, level: numb
             nestedContainer = group;
         }
 
-        return what.map(x => mapAsDOM(x, { scrollCallback: cx.scrollCallback, container: nestedContainer }, level + 1));
+        let fragment = document.createDocumentFragment();
+
+        for (const branch of node) {
+            await mapAsDOM(branch, { scrollCallback: cx.scrollCallback, container: fragment }, level + 1);
+        }
+
+        nestedContainer.appendChild(fragment);
+        return;
     }
 
-    if (typeof what === "object") {
-        let entries = Object.entries(what);
+    if (node instanceof Set) {
+        return mapAsDOM([...node], cx, level);
+    }
+
+    if (typeof node === "object") {
+        let entries = Object.entries(node);
         let objectContainer = cx.container;
         if (level > 0 && entries.length > 1) {
             objectContainer = cx.container.createEl('fieldset', { cls: 'query-result-group' })
         }
-
-        const groups: any[] = [];
-
+        let objFragment = document.createDocumentFragment();
         for (const [key, value] of entries) {
-            let kvContainer = objectContainer.createEl('fieldset', { cls: 'query-result-group' });
+            let kvContainer = objFragment.createEl('fieldset', { cls: 'query-result-group' });
             kvContainer.createEl('legend', { text: key });
 
-            groups.push(mapAsDOM(value, { scrollCallback: cx.scrollCallback, container: kvContainer }, 0));
+            await mapAsDOM(value, { scrollCallback: cx.scrollCallback, container: kvContainer }, 0);
         }
+        objectContainer.appendChild(objFragment);
 
-        return groups;
+        return;
     }
 
-    if (typeof what === "function") {
-        return cx.container.createSpan({ text: what.toString(), cls: "query-result-entry item" });
+    if (typeof node === "function") {
+        cx.container.createSpan({ text: node.toString(), cls: "query-result-entry item" });
+        return;
     }
 
-    return cx.container.createSpan({ text: JSON.stringify(what, null, " "), cls: "query-result-entry item" });
+    cx.container.createSpan({ text: JSON.stringify(node, null, " "), cls: "query-result-entry item" });
 }

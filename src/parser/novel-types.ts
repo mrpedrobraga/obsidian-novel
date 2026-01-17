@@ -8,12 +8,12 @@ export interface Render {
     asText(): string;
 
     /** Returns some DOM representing this item. */
-    asDOM(cx: NovelComponentContext): HTMLElement;
+    pushDOM(cx: NovelComponentContext): Promise<void>;
 }
 
 export interface NovelComponentContext {
     scrollCallback(position: number): (event: Event) => void;
-    container: HTMLElement;
+    container: Node;
 }
 
 
@@ -38,13 +38,13 @@ export class Reference extends DocumentTextRange implements Render {
         return this.alias ?? this.referent;
     }
 
-    asDOM(cx: NovelComponentContext): HTMLElement {
+    async pushDOM(cx: NovelComponentContext) {
         const element = cx.container.createEl('a');
         element.classList.add('query-result-entry', 'item');
         element.setAttribute('href', '#');
         element.createDiv({ cls: 'novel-action-line', text: this.asText() });
         element.addEventListener('mousedown', cx.scrollCallback(this.from));
-        return element;
+
     }
 }
 
@@ -74,12 +74,12 @@ export class RichText implements Render {
         }).join("");
     }
 
-    asDOM(cx: NovelComponentContext): HTMLElement {
+    async pushDOM(cx: NovelComponentContext) {
         const element = cx.container.createEl('a');
         element.classList.add('query-result-entry', 'item');
         element.setAttribute('href', '#');
         element.createDiv({ cls: 'novel-action-line', text: this.asText() });
-        return element;
+
     }
 }
 
@@ -113,7 +113,7 @@ export class NovelDocument implements Render {
         return this.metadata["Summary"] ?? 'Novel Document';
     }
 
-    asDOM(cx: NovelComponentContext): HTMLElement {
+    async pushDOM(cx: NovelComponentContext) {
         const element = cx.container.createEl('a');
         element.classList.add('query-result-entry', 'document');
         element.setAttribute('href', '#'); element.createDiv({ cls: 'title', text: `Novel Document` });
@@ -128,7 +128,7 @@ export class NovelDocument implements Render {
             evt.stopPropagation();
             cx.scrollCallback(0)(evt);
         });
-        return element;
+
     }
 }
 
@@ -142,7 +142,7 @@ export class NovelScene extends DocumentTextRange implements Render {
         return this.name;
     }
 
-    asDOM(cx: NovelComponentContext): HTMLElement {
+    async pushDOM(cx: NovelComponentContext) {
         const element = cx.container.createEl('a');
         element.classList.add('query-result-entry', 'scene');
         element.setAttribute('href', '#'); element.createDiv({ cls: 'title', text: `${this.name}` });
@@ -157,7 +157,7 @@ export class NovelScene extends DocumentTextRange implements Render {
             evt.stopPropagation();
             cx.scrollCallback(this.from)(evt);
         });
-        return element;
+
     }
 }
 
@@ -175,13 +175,13 @@ export class ActionLine extends DocumentTextRange implements Render {
         return this.content.asText();
     }
 
-    asDOM(cx: NovelComponentContext): HTMLElement {
+    async pushDOM(cx: NovelComponentContext) {
         const element = cx.container.createEl('a');
         element.classList.add('query-result-entry', 'item');
         element.setAttribute('href', '#');
         element.createDiv({ cls: 'novel-action-line', text: this.content.asText() });
         element.addEventListener('mousedown', cx.scrollCallback(this.from));
-        return element;
+
     }
 }
 
@@ -195,13 +195,13 @@ export class DialogueLine extends DocumentTextRange implements Render {
         return this.content.asText();
     }
 
-    asDOM(cx: NovelComponentContext): HTMLElement {
+    async pushDOM(cx: NovelComponentContext) {
         const element = cx.container.createEl('a');
         element.classList.add('query-result-entry', 'item');
         element.setAttribute('href', '#');
         element.createDiv({ cls: 'novel-action-line', text: this.content.asText() });
         element.addEventListener('mousedown', cx.scrollCallback(this.from));
-        return element;
+
     }
 }
 
@@ -215,7 +215,7 @@ export class TaggedAction extends DocumentTextRange implements Render {
         return `@${this.tag} - ${this.content.asText().trim()}`;
     }
 
-    asDOM(cx: NovelComponentContext): HTMLElement {
+    async pushDOM(cx: NovelComponentContext) {
         const element = cx.container.createEl('a');
         element.classList.add('query-result-entry', 'item', 'selected');
         element.setAttribute('href', '#');
@@ -224,7 +224,7 @@ export class TaggedAction extends DocumentTextRange implements Render {
         element.classList.add(`tag-${this.tag.trim().toLowerCase()}`);
 
         element.addEventListener('mousedown', cx.scrollCallback(this.from));
-        return element;
+
     }
 }
 
