@@ -151,8 +151,7 @@ function buildDecorations(view: NovelView, state: EditorState, visibleRanges: Do
             const commentMatch = /^(\/\/\s*)(.+)$/.exec(line.text);
             if (commentMatch) {
                 builder.add(line.from, line.from + (commentMatch[1]?.length ?? 0), Decoration.mark({ class: "hide" }));
-                builder.add(line.from, line.to, Decoration.mark({ class: `novel-comment ${isSelectedClass}` }));
-                pos = line.to + 1;
+                pos = parseRichTextRange(line, lineHasCursor, `novel-comment`, pos);
                 continue;
             }
 
@@ -162,7 +161,7 @@ function buildDecorations(view: NovelView, state: EditorState, visibleRanges: Do
                 let key = propertyMatch[1]!;
                 const keyLen = 1 + key.length;
                 builder.add(line.from, line.from + keyLen, Decoration.mark({ class: 'novel-property-key' }));
-                builder.add(line.from, line.to, Decoration.mark({ class: 'novel-property' }));
+                pos = parseRichTextRange(line, lineHasCursor, `novel-property`, pos);
 
                 if (key === "Tags") {
                     let start = line.from + "Tags: ".length;
@@ -244,14 +243,22 @@ function buildDecorations(view: NovelView, state: EditorState, visibleRanges: Do
 
             // Dialogue / Action fallback
 
-            pos = parseRichTextRange(line, lineHasCursor, inDialogue, isSelectedClass, pos);
+            if (inDialogue) {
+                const isParentheticalClass = /^\s*\(.*?\)\s*/.test(line.text) ? 'parenthetical' : '';
+
+                pos = parseRichTextRange(line, lineHasCursor, `novel-dialogue ${isParentheticalClass}`, pos);
+            } else {
+                pos = parseRichTextRange(line, lineHasCursor, `novel-action-line`, pos);
+            }
         }
     }
 
     return builder.finish();
 
-    function parseRichTextRange(line: Line, lineHasCursor: boolean, inDialogue: boolean, isSelectedClass: string, pos: number) {
-        const lineDeco: { from: number; to: number; value: Decoration; }[] = [];
+    function parseRichTextRange(line: Line, lineHasCursor: boolean, lineClass: string, pos: number): number {
+        const isSelectedClass = lineHasCursor ? 'selected' : '';
+
+        const decorations: { from: number; to: number; value: Decoration; }[] = [];
 
         // Wikilinks
         const WIKILINK_REGEX = /\[\[([^\]]+?)(?:\|([^\]]+?))?\]\]/g;
@@ -260,9 +267,9 @@ function buildDecorations(view: NovelView, state: EditorState, visibleRanges: Do
             const end = start + match[0].length;
 
             if (lineHasCursor) {
-                lineDeco.push({ from: start, to: end, value: Decoration.mark({ class: 'novel-wikilink' }) });
+                decorations.push({ from: start, to: end, value: Decoration.mark({ class: 'novel-wikilink' }) });
             } else {
-                lineDeco.push({
+                decorations.push({
                     from: start, to: end, value: Decoration.replace({
                         widget: new ReferenceWidget(view.app, view.file?.path ?? "/", match as RegExpExecArray, match[1] ?? '[Broken Reference]', match[2])
                     })
@@ -277,9 +284,9 @@ function buildDecorations(view: NovelView, state: EditorState, visibleRanges: Do
             const end = start + match[0].length;
 
             if (lineHasCursor) {
-                lineDeco.push({ from: start, to: end, value: Decoration.mark({ class: 'novel-wikilink' }) });
+                decorations.push({ from: start, to: end, value: Decoration.mark({ class: 'novel-wikilink' }) });
             } else {
-                lineDeco.push({
+                decorations.push({
                     from: start, to: end, value: Decoration.replace({
                         widget: new LinkWidget(view.app, match as RegExpExecArray, match[2] ?? '#', match[1])
                     })
@@ -293,9 +300,9 @@ function buildDecorations(view: NovelView, state: EditorState, visibleRanges: Do
             const start = line.from + match.index!;
             const end = start + match[0].length;
 
-            lineDeco.push({ from: start, to: end, value: Decoration.mark({ class: 'bold' }) });
-            lineDeco.push({ from: start, to: start + 2, value: Decoration.mark({ class: 'hide' }) });
-            lineDeco.push({ from: start + match[1]!.length + 2, to: start + match[1]!.length + 4, value: Decoration.mark({ class: 'hide' }) });
+            decorations.push({ from: start, to: end, value: Decoration.mark({ class: 'bold' }) });
+            decorations.push({ from: start, to: start + 2, value: Decoration.mark({ class: 'hide' }) });
+            decorations.push({ from: start + match[1]!.length + 2, to: start + match[1]!.length + 4, value: Decoration.mark({ class: 'hide' }) });
         }
 
         const ITALIC_REGEX = /(?<!\*)\*([^\*]+?)\*/g;
@@ -303,38 +310,28 @@ function buildDecorations(view: NovelView, state: EditorState, visibleRanges: Do
             const start = line.from + match.index!;
             const end = start + match[0].length;
 
-            lineDeco.push({ from: start, to: end, value: Decoration.mark({ class: 'italic' }) });
-            lineDeco.push({ from: start, to: start + 1, value: Decoration.mark({ class: 'hide' }) });
-            lineDeco.push({ from: start + match[1]!.length + 1, to: start + match[1]!.length + 2, value: Decoration.mark({ class: 'hide' }) });
+            decorations.push({ from: start, to: end, value: Decoration.mark({ class: 'italic' }) });
+            decorations.push({ from: start, to: start + 1, value: Decoration.mark({ class: 'hide' }) });
+            decorations.push({ from: start + match[1]!.length + 1, to: start + match[1]!.length + 2, value: Decoration.mark({ class: 'hide' }) });
         }
 
-        if (inDialogue) {
-            const isParentheticalClass = /^\s*\(.*?\)\s*/.test(line.text) ? 'parenthetical' : '';
+        /** Decoration for the entire range */
+        decorations.push({
+            from: line.from,
+            to: line.to,
+            value: Decoration.mark({ class: `${lineClass} ${isSelectedClass}` })
+        });
 
-            lineDeco.push({
-                from: line.from,
-                to: line.to,
-                value: Decoration.mark({
-                    class: `novel-dialogue ${isParentheticalClass} ${isSelectedClass}`
-                })
-            });
-        } else {
-            lineDeco.push({
-                from: line.from,
-                to: line.to,
-                value: Decoration.mark({ class: `novel-action-line ${isSelectedClass}` })
-            });
-        }
-
-        lineDeco.sort((a, b) => {
+        decorations.sort((a, b) => {
             if (a.from == b.from) {
                 return 0;
             } else {
                 return a.from - b.from;
             }
         });
-        lineDeco
-            .forEach(deco => builder.add(deco.from, deco.to, deco.value));
+        for (const decoration of decorations) {
+            builder.add(decoration.from, decoration.to, decoration.value);
+        }
 
         pos = line.to + 1;
         return pos;

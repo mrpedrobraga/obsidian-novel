@@ -72,10 +72,10 @@ If your plugin does not need CSS, delete this file.
 }
 
 .novel-view .novel-scene-header.scene-tagged-complete {
-    color: var(--color-red);
+    color: var(--color-green);
 
     &::before {
-        content: "📕";
+        content: "📗";
     }
 }
 
@@ -157,7 +157,7 @@ If your plugin does not need CSS, delete this file.
 
 .novel-property-key {
     font-weight: bolder;
-    color: var(--color-green);
+    color: var(--color-accent);
     font-family: var(--font-monospace-theme), 'Courier Prime';
 }
 
@@ -492,11 +492,11 @@ If your plugin does not need CSS, delete this file.
 
 .query-result-entry.scene.scene-tagged-complete .title {
     &::before {
-        content: "📕 " counter(entry-no) ". ";
+        content: "📗 " counter(entry-no) ". ";
     }
 
     color: color-mix(in srgb,
-        var(--color-red) 80%,
+        var(--color-green) 80%,
         var(--text-normal));
     ;
     font-weight: bold;

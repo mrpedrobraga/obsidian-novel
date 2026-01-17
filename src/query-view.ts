@@ -121,12 +121,9 @@ export class QueryView extends View {
 
             if (result.success) {
                 const resultValue = result.value;
-                const start = performance.now();
                 const fragment = document.createDocumentFragment();
                 await mapAsDOM(resultValue, { scrollCallback, container: fragment });
                 this.resultsContainer.appendChild(fragment);
-                await new Promise(requestAnimationFrame);
-                console.log(currentQuery, performance.now() - start);
 
             } else {
                 this.resultsContainer.empty();
